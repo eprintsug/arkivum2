@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="iso-8859-1" standalone="no" ?>
+<!DOCTYPE phrases SYSTEM "entities.dtd">
+
+<epp:phrases xmlns="http://www.w3.org/1999/xhtml"
+            xmlns:epp="http://eprints.org/ep3/phrase">
+
+    <epp:phrase id="Plugin/Screen/EPrint/UploadMethod/Arkivum:title">Archival upload</epp:phrase>
+    <epp:phrase id="Plugin/InputForm/Component/Upload:Arkivum">
+	<div id="file_tree">
+		Arkvivum fancytree here
+	</div>	
+	<div id="button_panel">
+		<button class="ep_form_internal_button" id="ft_select_all">Select all</button>
+		<button class="ep_form_internal_button" id="ft_deselect_all">Deselect all</button>
+		<button class="ep_form_internal_button" id="ft_expand_all">Expand all</button>
+		<button class="ep_form_internal_button" id="ft_collapse_all">Collapse all</button>
+	</div>
+	<div>
+		Available OC shares here
+	</div>	
+
+    </epp:phrase>
+
+
+</epp:phrases>
