@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+
+use EPrints;
+use Switch;
+
+my $repository = EPrints->new->current_repository;
+my $eprintid = $repository->param("eprintid");
+my $action = $repository->param("action");
+my $password = $repository->param("password") || undef;
+my $username = $repository->param("username") || undef;
+
+
+
+die("EPrintid is malformed: $eprintid") unless($eprintid=~ /^\d+$/);
+die("Action is not known: $action") unless(grep $_ eq $action, qw(get create));
+
+if($action eq "create"){
+
+	my $data = {path => $repository->get_conf("arkivum", "symlink")."/".$eprintid, 
+				shareType => 3, #publiclink
+				publicUpload => "true", 
+				permissions => 31 }; #all
+	#A public link with a password, passowrds may be mandatory depending on OC config
+	$data->{password} = $password if(defined $password);
+	
+	#A share with a specific user
+	if(defined $username){
+		$data->{shareWith} = $username;
+		$data->{shareType} = 0;	
+	}
+
+	my $share_xml = _oc_postRequest("/shares", $data);
+	print $repository->xml->to_string($share_xml);
+}
+
+if($action eq "get"){
+	print _oc_getRequest("/shares");
+}
+
+sub _oc_getRequest
+{
+	my( $url ) = @_;
+
+	my $oc_server = $repository->get_conf("arkivum", "file_share_api");
+
+	my $server_url = $oc_server . $url;
+	print STDERR $server_url."\n";
+	my $ua       = LWP::UserAgent->new();
+	#$ua->credentials( $server_url, 'Basic', 'astoradmin', 'arkivum');
+	print STDERR "GET: ".$server_url."\n";
+	my $response = $ua->get( $server_url );
+
+	return $response->content;
+}
+
+sub _oc_postRequest
+{
+      my( $url, $data ) = @_;
+
+      my $ark_server = $repository->get_conf("arkivum", "file_share_api");
+
+      my $server_url = $ark_server . $url;
+      print STDERR "POST: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X POST $server_url ";
+	while(my($k,$v) = each %{$data}){
+		$curl_cmd .=" -d ".$k."=".$v;
+	}
+	print STDERR $curl_cmd."\n";
+	#system($curl_cmd)==0 or return 0;
+	my $response = `$curl_cmd`;
+	my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	return $share_xml;
+     
+	#...need libwww6.0
+      my $ua = LWP::UserAgent->new();
+      $ua->default_header( "Content-Type" =>  "application/x-www-form-urlencoded");
+	#to do this...?
+     # $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
+      my $req = HTTP::Request::Common::POST $server_url,
+                $data;
+
+      my $response = $ua->request($req);
+	print STDERR $response->status_line."**\n";
+      return $response;
+}
+

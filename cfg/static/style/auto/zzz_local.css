@@ -14,3 +14,35 @@
 
 table.ep_tm_searchbar { height: 30px; }
 table.ep_tm_searchbar td {padding-left: 20px; }
+
+.button_panel { padding: 5px;}
+
+div.document_md {
+	margin: 2em 2em;
+}
+div.document_md dl {
+	width: 100%;
+}
+
+div.document_md dt {
+	margin-top: 1em;
+	float: left;
+	width: 30%;
+  	clear: left;
+}
+
+div.document_md dd {
+	float: left;
+	width: 70%;
+}
+button.update_md {
+	clear:both;
+	display: block;
+	margin-top: 10em;
+}
+div.share_panel {
+	margin: 2em 2em;
+}
+#create_oc_user { display: none; }
+#have_oc_user { display: none; }
+.ep_username { font-weight: bold; }

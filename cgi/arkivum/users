@@ -1,0 +1,77 @@
+#!/usr/bin/perl
+
+use EPrints;
+use Switch;
+
+my $repository = EPrints->new->current_repository;
+my $username = $repository->param("username");
+my $action = $repository->param("action");
+my $password = $repository->param("password") || undef;
+
+
+die("Scared of characters in: $username") unless($username=~ /^[A-Z a-z 0-9 \.\-]+$/);
+die("Action is not known: $action") unless(grep $_ eq $action, qw(get create));
+
+if($action eq "create"){
+
+	die("Scared of characters in password") unless(defined $password && $password=~ /^[A-Z a-z 0-9 \.\-]+$/);
+
+	my $data = {userid => $username,
+		    password => $password};
+
+	my $users_xml = _oc_postRequest("/users", $data);
+	print $repository->xml->to_string($users_xml);
+}
+
+if($action eq "get"){
+	print _oc_getRequest("/users/$username");
+}
+
+sub _oc_getRequest
+{
+	my( $url ) = @_;
+
+	my $oc_server = $repository->get_conf("arkivum", "oc_users_api");
+
+	my $server_url = $oc_server . $url;
+	print STDERR $server_url."\n";
+	my $ua       = LWP::UserAgent->new();
+	#$ua->credentials( $server_url, 'Basic', 'astoradmin', 'arkivum');
+	print STDERR "GET: ".$server_url."\n";
+	my $response = $ua->get( $server_url );
+
+	return $response->content;
+}
+
+sub _oc_postRequest
+{
+      my( $url, $data ) = @_;
+
+      my $ark_server = $repository->get_conf("arkivum", "oc_users_api");
+
+      my $server_url = $ark_server . $url;
+      print STDERR "POST: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X POST $server_url ";
+	while(my($k,$v) = each %{$data}){
+		$curl_cmd .=" -d ".$k."=".$v;
+	}
+	print STDERR $curl_cmd."\n";
+	#system($curl_cmd)==0 or return 0;
+	my $response = `$curl_cmd`;
+	my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	return $share_xml;
+     
+	#...need libwww6.0
+      my $ua = LWP::UserAgent->new();
+      $ua->default_header( "Content-Type" =>  "application/x-www-form-urlencoded");
+	#to do this...?
+     # $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
+      my $req = HTTP::Request::Common::POST $server_url,
+                $data;
+
+      my $response = $ua->request($req);
+	print STDERR $response->status_line."**\n";
+      return $response;
+}
+

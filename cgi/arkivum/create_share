@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+
+use EPrints;
+
+sub _oc_getRequest
+{
+	#my( $self, $url ) = @_;
+	my( $url ) = @_;
+
+	my $oc_server = $self->{repository}->get_conf("arkivum", "share_api");
+
+	my $server_url = $oc_server . $url;
+	my $ua       = LWP::UserAgent->new();
+	print STDERR "GET: ".$server_url."\n";
+	my $response = $ua->get( $server_url );
+
+	return $response;
+}
+
+sub _oc_postRequest
+{
+#      my( $self, $url, $data ) = @_;
+      my( $url, $data ) = @_;
+
+
+      my $ark_server = $self->{repository}->get_conf("arkivum", "share_api");
+
+      my $server_url = $ark_server . $url;
+      print STDERR "POST: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X POST $server_url ";
+	while(my($k,$v) = each %{$data}){
+		$curl_cmd .=" -d ".$k."=".$v;
+	}
+	print STDERR $curl_cmd."\n";
+	system($curl_cmd)==0 or return 0;
+	return 1;
+     
+	#...need libwww6.0
+      my $ua = LWP::UserAgent->new();
+      $ua->default_header( "Content-Type" =>  "application/x-www-form-urlencoded");
+	#to do this...?
+     # $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
+      my $req = HTTP::Request::Common::POST $server_url,
+                $data;
+
+      my $response = $ua->request($req);
+	print STDERR $response->status_line."**\n";
+      return $response;
+}
+
