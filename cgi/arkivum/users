@@ -35,7 +35,7 @@ sub _oc_getRequest
 
 	my $server_url = $oc_server . $url;
 	print STDERR $server_url."\n";
-	my $ua       = LWP::UserAgent->new();
+	my $ua = LWP::UserAgent->new();
 	#$ua->credentials( $server_url, 'Basic', 'astoradmin', 'arkivum');
 	print STDERR "GET: ".$server_url."\n";
 	my $response = $ua->get( $server_url );

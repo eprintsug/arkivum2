@@ -46,3 +46,19 @@ div.share_panel {
 #create_oc_user { display: none; }
 #have_oc_user { display: none; }
 .ep_username { font-weight: bold; }
+
+#file_tree td {text-align: center;}
+#file_tree td.ft_left{ text-align: left;}
+.license { display: inline-block; width: 80px; height: 15px; background-size: 80px 15px;}
+.cc_by { background-image: url("images/cc_by.png");}
+.cc_by_nd { background-image: url("images/cc_by_nd.png");}
+.cc_by_sa { background-image: url("images/cc_by_sa.png");}
+.cc_by_nc { background-image: url("images/cc_by_nc.png");}
+.cc_by_nc_nd { background-image: url("images/cc_by_nc_nd.png");}
+.cc_by_nc_sa { background-image: url("images/cc_by_nc_sa.png");}
+.cc_public_domain { background-image: url("images/cc_public_domain.png");}
+/*for arkivum rep states*/
+.red {color: #c00;}
+.amber {color: #ffbf00;}
+.green {color: #0c0;}
+

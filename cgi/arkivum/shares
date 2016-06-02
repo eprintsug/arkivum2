@@ -34,7 +34,7 @@ if($action eq "create"){
 }
 
 if($action eq "get"){
-	print _oc_getRequest("/shares");
+	print _oc_getRequest("/shares?path=".$repository->get_conf("arkivum", "symlink")."/".$eprintid);
 }
 
 sub _oc_getRequest

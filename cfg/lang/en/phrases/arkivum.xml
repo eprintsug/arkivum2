@@ -19,8 +19,27 @@
 					<p style="margin-top: 0px">This allows for direcct upload to your institution's Arkivum appliance, whilst maintaining details of research metadata, including access control and embargoes here in the repository. To upload a document must create and/or use a "share" which will allow you to upload files via <a href="{$config{arkivum}{file_share_api}}">you institutional "cloud" file share</a>. Once uploaded you may use the interface below to record file level metadata.</p>
 				</div>
 			</div>	
-			<div id="file_tree">
-			</div>	
+	<!--		<div id="file_tree">
+			</div>	-->
+<table id="file_tree" class="table table-condensed table-hover table-striped fancytree-fade-expander">
+    <colgroup>
+      <col width="20px"></col>
+      <col width="30px"></col>
+      <col width="*"></col>
+      <col width="80px"></col>
+      <col width="40px"></col>
+      <col width="100px"></col>
+      <col width="100px"></col>
+      <col width="100px"></col>
+    </colgroup>
+    <thead>
+      <tr> <th></th> <th></th> <th>File name</th> <th>License</th> <th>Restrictions</th> <th>Embargo date</th> <th>Ingest state</th><th>Replication</th><th>Last accessed</th>
+</tr>
+    </thead>
+    <tbody>
+      <tr> <td class="ft_left"></td> <td class="ft_left"></td> <td class="ft_left"></td> <td></td> <td></td> <td></td> <td></td><td></td> <td></td></tr>
+    </tbody>
+  </table>
 			<div class="button_panel">
 				<button class="ep_form_internal_button" id="ft_select_all">Select all</button>
 				<button class="ep_form_internal_button" id="ft_deselect_all">Deselect all</button>
@@ -32,7 +51,7 @@
 				   <dl>
 					<dt><epc:phrase ref="document_fieldname_security"/></dt>
 					<dd>
-					<select name="security">
+					<select name="security" class="document_md_input" id="security">
 						<option value="public"><epc:phrase ref="security_typename_public"/></option>
 						<option value="validuser"><epc:phrase ref="security_typename_validuser"/></option>
 						<option value="staffonly"><epc:phrase ref="security_typename_staffonly"/></option>
@@ -40,7 +59,7 @@
 					</dd>
 					<dt><epc:phrase ref="document_fieldname_license"/></dt>
 					<dd>
-					<select name="license">
+					<select name="license" class="document_md_input">
 						<epc:foreach expr="$config{arkivum}{licenses}" iterator="l">	
 							<option value="{$l}"><epc:phrase ref="licenses_typename_{$l}"/></option>
 						</epc:foreach>
@@ -48,8 +67,8 @@
 					</dd>
 					<dt><epc:phrase ref="document_fieldname_date_embargo"/></dt>
 					<dd>
-						Year: <input name="date_embargo_year" id="date_embargo_year" maxlength="4" type="text" class="" size="4"/> 
-						Month: <select name="date_embargo_month" id="date_embargo_month">
+						Year: <input name="date_embargo_year" id="date_embargo_year" maxlength="4" type="text" size="4" class="document_md_input"/> 
+						Month: <select name="date_embargo_month" id="date_embargo_month" class="document_md_input">
 							<option value="00">Unspecified</option>
 							<option value="01">January</option>
 							<option value="02">February</option>
@@ -64,7 +83,7 @@
 							<option value="11">November</option>
 							<option value="12">December</option>
 							</select> 
-							Day: <select name="date_embargo_day" id="date_embargo_day">
+							Day: <select name="date_embargo_day" id="date_embargo_day" class="document_md_input">
 								<option value="00">?</option>
 								<epc:foreach expr="$config{arkivum}{days}" iterator="n">
 									<option value="{$n}"><epc:print expr="$n"/></option>

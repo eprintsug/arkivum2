@@ -61,14 +61,27 @@ function Arkivum(config){
         };
 
 	//Call export on the ArkivumFiles Plugin, if an item folder doesn't already exist it will do after this
-	this.get_files_data = function(){
-		var url="/cgi/export/eprint/"+eprintid+"/ArkivumFiles/"+repoid+"-eprint-"+eprintid+".js";
+	this.get_files_data = function(in_loop=false){
+		var url="/cgi/export/eprint/"+eprintid+"/ArkivumFiles/"+repoid+"-eprint-"+(new Date).getTime()+".js";
 		console.log("url", url);
 		self.ArkivumFiles_call = j.ajax( url )
 		  .done(function(data) {
-		    console.log( "success", data );
+		    console.log( "success", data, in_loop );
+	//JSON.stringify comparison reports constant change after actual change. I imagine that the object is too complex for simpler comparison :(
+		//Ideally something like this would allow us to pick changes to the astor_md (or doc_md) for each child but...
+//		    if(in_loop && JSON.stringify(data.children) !== JSON.stringify(self.files_data.children)){
+		//This will only trigger if a file has been added or removed
+		    if(in_loop && data.children.length != self.files_data.children.length){
+			//change detected reload tree with new data
+			    j("#file_tree").fancytree("getTree").reload([data]);
+		    }
+
 		    self.files_data = data;
-		    self.render_file_tree();
+		    if(!in_loop){
+			//initial tree render:
+		 	self.render_file_tree();
+		    }
+		    setTimeout(self.get_files_data, 5000, true);
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
@@ -78,24 +91,60 @@ function Arkivum(config){
 		  });
 
 	};
+
 	this.render_file_tree = function(){
 		
 		j("#file_tree").fancytree({
 		  //TODO plug source in from TSWS
 		  source: [self.files_data ],
-		  extensions: ["glyph", "wide"],
+		  extensions: ["glyph", "wide", "persist", "table"],
 		  glyph: glyph_opts,
 		  checkbox: true,
-		  selectMode: 2,
-		  lazyLoad: function(event,data) {
-            		var node = data.node;   
-//			console.log(data);
-            		//data.node.load(true);             
-            		// Issue an ajax request to load child nodes
-//            		data.result = { cache:false, url: "myurl/jsonoutput", data: {key: node.key } }
-        	  }, 
-		});	
-		self.init_buttons();
+		  selectMode: 3,
+		  persist: {
+		    // Available options with their default:
+		    cookieDelimiter: "~",    // character used to join key strings
+		    cookiePrefix: undefined, // 'fancytree-<treeId>-' by default
+		    cookie: { // settings passed to jquery.cookie plugin
+		      raw: false,
+		      expires: "",
+		      path: "",
+		      domain: "",
+		      secure: false
+		    },
+		    expandLazy: false, // true: recursively expand and load lazy nodes
+  	  	    overrideSource: true,  // true: cookie takes precedence over `source` data attributes.
+    		    store: "auto",     // 'cookie': use cookie, 'local': use localStore, 'session': use sessionStore
+    		    types: "active expanded focus selected"  // which status types to store
+  		  },
+		table: {
+        	checkboxColumnIdx: 1,
+        	nodeColumnIdx: 2
+      		},
+ 		renderColumns: function(event, data) {
+			var node = data.node,
+		  	tdList = j(node.tr).find(">td");
+			tdList.eq(0).text(node.getIndexHier());
+			if(node.isFolder()) return true;
+			tdList.eq(3).html('<span class="license '+node.data.doc_md.license+'"></span>');
+			if(node.data.doc_md.security == "validuser")
+				tdList.eq(4).html('<span class="glyphicon glyphicon-user"></span>');
+			if(node.data.doc_md.security == "staffonly")
+				tdList.eq(4).html('<span class="glyphicon glyphicon-lock"></span>');
+
+			if(node.data.doc_md.date_embargo != undefined && node.data.doc_md.security === "public")
+				tdList.eq(5).html('<span class="glyphicon glyphicon-exclamation-sign amber"></span> security is still public');
+			else if(node.data.doc_md.date_embargo != undefined)
+				tdList.eq(5).html(node.data.doc_md.date_embargo);
+
+			tdList.eq(6).html('<span class=""> '+node.data.astor_md.ingestState+'</span>');
+			tdList.eq(7).html('<span class="glyphicon glyphicon-hdd '+node.data.astor_md.replicationState+'"></span>');
+			var accessed = node.data.astor_md.accessed.split(/T/);
+			tdList.eq(8).html('<span class="astor_accessed">'+accessed[0]+'</span>');
+
+	      },
+           });	
+	   self.init_buttons();
 	};
 
 
@@ -107,7 +156,7 @@ function Arkivum(config){
 		  .done(function(data) {
 		    self.shares = j("data > element", data);
 		    self.render_shares();
-		    console.log( "success", data );
+//		    console.log( "success", data );
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
@@ -115,7 +164,6 @@ function Arkivum(config){
 		  .always(function() {
 		    console.log( "get_shares complete" );
 		  });
-
 	};
 	this.render_shares = function(){
 		console.log(self.shares);
@@ -139,7 +187,7 @@ function Arkivum(config){
 			data.username = sw_username;
 		self.ArkivumFiles_call = j.ajax( url, {data: data, dataType: "xml" } )
 		  .done(function(data) {
-			console.log(data);
+	//		console.log(data);
 		    if(j("meta > statuscode", data).text() !== "100")
 			alert("Could not create a share: "+j("meta > message", data).text());
 		    else
@@ -160,7 +208,7 @@ function Arkivum(config){
 		var url="/cgi/arkivum/users";
 		j.ajax( url, {data: {username: username, action: 'get'}, dataType: "xml" } )
 		  .done(function(data) {
-		    console.log( "success", data, username );
+//		    console.log( "success", data, username );
 	  	    j(".ep_username").html(username);
 		    if(j("meta > statuscode", data).text() == "998"){
 			j("input[name='oc_user']").val(username);
@@ -183,7 +231,6 @@ function Arkivum(config){
 	this.render_user = function(){
 		j("p#oc_user").html( );
 		j(self.shares).each(function(i){
-			console.log(i,j("token", this).text());
 			j("ul#shares_list").append('<li><a href="'+file_share_url+'/'+j("token", this).text()+'">'+j("token", this).text()+'</a></li>');
 		})
 	}
@@ -195,7 +242,6 @@ function Arkivum(config){
 			data.password = j("input[name='oc_pw']").val();
 		j.ajax( url, {data: data, dataType: "xml" } )
 		  .done(function(data) {
-		    console.log(data);
 		    if(j("meta > statuscode", data).text() !== "100")
 			alert("Could not create a user: "+j("meta > message", data).text());
 		    else
@@ -214,6 +260,34 @@ function Arkivum(config){
 		self.create_share(username);
 		return false;
 	};
+
+	this.update_md = function(){
+		var data = {};
+		j(".document_md_input").each(function(){
+		     data[this.name]= this.value;
+		});
+		data.astorids = [];
+		j("#file_tree").fancytree("getTree").getSelectedNodes().each(function(node){
+		     if(node.isFolder()) return false;
+		     data.astorids.push(node.key);
+		});
+
+		data.eprintid = eprintid;
+		var url = "/cgi/arkivum/update_doc_md";
+		j.ajax( url, {data: data, dataType: "json" } )
+		  .done(function(data) {
+		    console.log( "success", data );
+		    j("#file_tree").fancytree("getTree").reload([data]);
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "get_user complete" );
+		  });
+	
+		return false;
+	}
 	this.init_buttons = function(){
 		j("#ft_expand_all").on("click", function(){
 		   j("#file_tree").fancytree("getTree").visit(function(node){
@@ -242,6 +316,16 @@ function Arkivum(config){
 		j("#oc_create_share").on("click", self.create_share);
 		j("#oc_create_user").on("click", self.create_user);
 		j("#oc_create_user_share").on("click", self.create_user_share);
+		j("#update_md").on("click", self.update_md);
+		j("#date_embargo_year").on("keyup",function(){
+			console.log("changed", j(this).val());
+			if(j(this).val().match(/\d{4}/)){
+				console.log("valid year");
+				j("#security").val("staffonly");
+			}else{
+				j("#security").val("public");
+			}
+		});
 	};
 	self.init();
 }

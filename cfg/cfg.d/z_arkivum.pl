@@ -30,11 +30,14 @@ $c->{plugin_alias_map}->{"InputForm::Component::ArkivumDocuments"} = undef;
 $arkivum->{libs} = {
 		    cdn => [
 			"https://code.jquery.com/jquery-2.2.3.min.js",
+			"https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.0.1/js.cookie.min.js",
 			"https://code.jquery.com/ui/1.10.4/jquery-ui.min.js",
 			"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js",
 			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/jquery.fancytree-all.min.js",
 			"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
-			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/skin-bootstrap/ui.fancytree.min.css"
+			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/skin-bootstrap/ui.fancytree.min.css",
+			#NB this is not a CDN!
+#			"http://wwwendt.de/tech/fancytree/src/jquery.fancytree.persist.js",
 			],
 		#Add refs for local libs here if necessary
 		local => [],
@@ -48,12 +51,6 @@ cc_by_nc
 cc_by_nc_nd
 cc_by_nc_sa
 cc_by_sa
-cc_by_nd_4
-cc_by_4
-cc_by_nc_4
-cc_by_nc_nd_4
-cc_by_nc_sa_4
-cc_by_sa_4
 cc_public_domain
 cc_gnu_gpl
 cc_gnu_lgpl
@@ -108,23 +105,6 @@ EOJ
 		}
 		$head->appendChild( $repo->xml->create_text_node( "\n    " ) );
 	}
-=comment
-        $head->appendChild( $repo->make_javascript( undef,
-                src => "https://code.jquery.com/jquery-2.2.3.min.js"
-        ) );
-	$head->appendChild( $repo->xml->create_text_node( "\n    " ) );
-        $head->appendChild( $repo->make_javascript( undef,
-                src => "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
-        ) );
-
-
-	$head->appendChild( $repo->xml->create_text_node( "\n    " ) );
-	$head->appendChild( $repo->xml->create_element( "link",
-			rel => "stylesheet",
-			href => "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
-		) );
-	$head->appendChild( $repo->xml->create_text_node( "\n    " ) );
-=cut
 	# Reset the font-size to 100% after bootstrap
 	$head->appendChild( my $style = $repo->xml->create_element( "style") );
 	$style->appendChild( $repo->make_text( "html { font-size: 100%; }" ) );
