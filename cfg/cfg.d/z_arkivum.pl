@@ -10,6 +10,11 @@ $arkivum->{file_share_password} = "arkivum";
 
 $arkivum->{file_share_api} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/ocs/v1.php/apps/files_sharing/api/v1";
 $arkivum->{file_share_url} = "https://".$arkivum->{file_share_host}."/index.php";
+$arkivum->{file_share_webdav} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/remote.php/webdav";
+$arkivum->{file_share_symlink} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/index.php/apps/symlinks/api/0.1/symlinks";
+
+
+
 $arkivum->{oc_users_api} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/ocs/v1.php/cloud";
 
 $arkivum->{default_document_security} = "public";
@@ -77,22 +82,22 @@ $c->add_trigger( EP_TRIGGER_DYNAMIC_TEMPLATE, sub {
         my $head = $repo->make_doc_fragment;
 
 	# dynamic CSS/JS settings
-	my $eprintid;
-	my $username;
+	my $eprintid="NO_EPRINTID";
+	my $username="NO_USERNAME";
 	unless($repo->{offline}){
 		if(defined $repo->param("eprintid")){
 			$eprintid = $repo->param("eprintid");
 		}elsif($repo->current_url =~ /\/(\d+)$/){
 			$eprintid = $1;
 		}
-		$username = $repo->current_user->value("username");
-
-	}else{
-		#there must be a way to access eprintid when generating abstract here....
-		$eprintid = "undefined"; #for now we'll do this and get from url with js
-		$username = "undefined"; #for now we'll do this and get from url with js
-
+		$username = $repo->current_user->value("username") if($repo->current_user);
 	}
+#	}else{
+#		#there must be a way to access eprintid when generating abstract here....
+#		$eprintid = "undefined"; #for now we'll do this and get from url with js
+#		$username = "undefined"; #for now we'll do this and get from url with js
+#
+#	}
 #	if(defined $eprintid){	
 		$head->appendChild( $repo->make_javascript(sprintf(<<'EOJ',
 var eprintid = %s;

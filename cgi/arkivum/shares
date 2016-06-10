@@ -8,11 +8,11 @@ my $eprintid = $repository->param("eprintid");
 my $action = $repository->param("action");
 my $password = $repository->param("password") || undef;
 my $username = $repository->param("username") || undef;
-
+my @astorids = $repository->param('astorids[]');      
 
 
 die("EPrintid is malformed: $eprintid") unless($eprintid=~ /^\d+$/);
-die("Action is not known: $action") unless(grep $_ eq $action, qw(get create));
+die("Action is not known: $action") unless(grep $_ eq $action, qw(get create, create_download));
 
 if($action eq "create"){
 
@@ -29,7 +29,59 @@ if($action eq "create"){
 		$data->{shareType} = 0;	
 	}
 
-	my $share_xml = _oc_postRequest("/shares", $data);
+      	my $url = $repository->get_conf("arkivum", "file_share_api")."/shares";
+
+	my $share_xml = _oc_postRequest($url, $data);
+	print $repository->xml->to_string($share_xml);
+}
+
+if($action eq "create_download"){
+
+	#FIRST TMP dir in TMP_LINKS dir
+	#TODO make config object for TMP_LINKS
+	my @chars = ("A".."Z", "a".."z");
+	my $tmp;
+	$tmp .= $chars[rand @chars] for 1..8;
+	my $data = {path => "TMP_LINKS/$tmp", 
+				shareType => 3, #publiclink
+				publicUpload => "false", 
+				permissions => 17 }; #read, share
+	my $tmp_path = "/TMP_LINKS/$tmp";
+
+	_oc_mkdir($tmp_path);
+	
+	#THEN CREATE SYMLINKS TO ACCESSIBLE FILES IN IT
+	my $user = $repository->current_user;
+	my $eprint = EPrints::DataObj::EPrint->new( $repository, $eprintid );
+
+	for my $doc($eprint->get_all_documents){
+		next if(!$doc->is_set("astorid")); #ignore local documents
+		print STDERR $doc->value("astorid")." ===> ".join(" - ", @astorids)."\n";
+		next if(!grep $_ eq $doc->value("astorid"), @astorids); #ignore unselected docs
+
+		#TODO actually check security here too, don't trust the js input!!!
+		my $data = {source => "/".$repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid."/".$doc->value("main"), link => $tmp_path."/".$doc->value("main")};
+		_oc_symlink($data);
+	}
+	#THEN CREATE A SHARE FOR THE TMP DIR WE MADE THAT IS NOW FULL OF LINKS....
+	my $data = {path => $tmp_path, 
+				shareType => 3, #publiclink
+				publicUpload => "false", 
+				permissions => 17 }; #read, share
+
+
+	#TODO this lot for downloads too	
+	#A public link with a password, passwords may be mandatory depending on OC config
+#	$data->{password} = $password if(defined $password);
+	#A share with a specific user
+#	if(defined $username){
+#		$data->{shareWith} = $username;
+#		$data->{shareType} = 0;	
+#	}
+
+      	my $url = $repository->get_conf("arkivum", "file_share_api")."/shares";
+
+	my $share_xml = _oc_postRequest($url, $data);
 	print $repository->xml->to_string($share_xml);
 }
 
@@ -46,7 +98,7 @@ sub _oc_getRequest
 	my $server_url = $oc_server . $url;
 	my $ua       = LWP::UserAgent->new();
 	#$ua->credentials( $server_url, 'Basic', 'astoradmin', 'arkivum');
-	print STDERR "GET: ".$server_url."\n";
+	print STDERR "shares GET: ".$server_url."\n";
 	my $response = $ua->get( $server_url );
 
 	return $response->content;
@@ -56,10 +108,12 @@ sub _oc_postRequest
 {
       my( $url, $data ) = @_;
 
-      my $ark_server = $repository->get_conf("arkivum", "file_share_api");
+#      my $ark_server = $repository->get_conf("arkivum", "file_share_api");
 
-      my $server_url = $ark_server . $url;
-      print STDERR "POST: ".$server_url."\n";
+ #     my $server_url = $ark_server . $url;
+     my $server_url = $url;
+
+      print STDERR "shares POST: ".$server_url."\n";
 	#not ideal but...
 	my $curl_cmd = "curl -k -X POST $server_url ";
 	while(my($k,$v) = each %{$data}){
@@ -84,3 +138,47 @@ sub _oc_postRequest
       return $response;
 }
 
+sub _oc_mkdir
+{
+      my( $url, $data ) = @_;
+
+
+      my $ark_server = $repository->get_conf("arkivum", "file_share_webdav");
+
+     my $server_url = $ark_server . $url;
+
+      print STDERR "shares MKCOL: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X MKCOL $server_url ";
+#	while(my($k,$v) = each %{$data}){
+#		$curl_cmd .=" -d ".$k."=".$v;
+#	}
+	print STDERR $curl_cmd."\n";
+	#system($curl_cmd)==0 or return 0;
+	my $response = `$curl_cmd`;
+#	my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	print STDERR $response."\n";
+	return $response;
+
+}	
+sub _oc_symlink
+{
+      my( $data ) = @_;
+
+
+      my $server_url = $repository->get_conf("arkivum", "file_share_symlink");
+
+      print STDERR "shares POST: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X POST $server_url ";
+	while(my($k,$v) = each %{$data}){
+		$curl_cmd .=" -d ".$k."=".$v;
+	}
+	print STDERR $curl_cmd."\n";
+	#system($curl_cmd)==0 or return 0;
+	my $response = `$curl_cmd`;
+	#my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	print STDERR $response."\n";	
+	return $response;
+
+}	

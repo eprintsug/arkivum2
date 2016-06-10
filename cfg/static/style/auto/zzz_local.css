@@ -44,6 +44,8 @@ div.share_panel {
 	margin: 2em 2em;
 }
 #create_oc_user { display: none; }
+#create_oc_user_div { display: none; }
+
 #have_oc_user { display: none; }
 .ep_username { font-weight: bold; }
 .ark_ingest { float: right; }

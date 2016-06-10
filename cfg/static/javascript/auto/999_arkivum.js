@@ -36,18 +36,15 @@ function Arkivum(config){
 
 	self = this;
 	//set default options here:
-        self.defaults = {};
+        self.defaults = {user : {type: "validuser"}};
 
 	this.init = function(config){
 		self.set_options(config);
 		console.log("Arkivum initalised for eprint: ",self.eprintid);
 		
 		self.get_files_data();
-		if(self.page_type == "dynamic"){
-			self.get_shares();
-			self.get_user();
-		}
-
+		self.get_shares();
+		self.get_user();
 	};
 	this.set_options = function(config){
                 //set any unset options that have defaults
@@ -129,6 +126,9 @@ function Arkivum(config){
  		renderColumns: self.render_columns,
 		init: function(){
 			self.file_tree = j("#file_tree").fancytree("getTree");
+			self.file_tree.visit(function(node){
+				node.setExpanded();
+			});
 		},
 		
            });	
@@ -170,8 +170,8 @@ function Arkivum(config){
 				tdList.eq(11).html(self.render_delete(node));
 			}
 		}else{
-			thList.eq(10).hide();
-			tdList.eq(10).hide();
+			thList.eq(10).html("Download");
+			tdList.eq(10).html(self.render_download_link(node,"download",render_download(node)));
 			thList.eq(11).hide();
 			tdList.eq(11).hide();
 
@@ -189,7 +189,7 @@ function Arkivum(config){
 		  .done(function(data) {
 		    self.shares = j("data > element", data);
 		    self.render_shares();
-//		    console.log( "success", data );
+		    console.log( "success", data );
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
@@ -200,29 +200,68 @@ function Arkivum(config){
 	};
 	this.render_shares = function(){
 		console.log(self.shares);
-		j("ul#shares_list").empty();
+		j("ul.shares_list").empty();
 		j(self.shares).each(function(i){
 			if(j("share_type", this).text() == "3") //public
-				j("ul#shares_list").append('<li>Public share link: <a href="'+file_share_url+'/s/'+j("token", this).text()+'">'+j("token", this).text()+'</a></li>');
+				j("ul.shares_list").append('<li>Public share link: <a href="'+file_share_url+'/s/'+j("token", this).text()+'">'+j("token", this).text()+'</a></li>');
 			if(j("share_type", this).text() == "0") //user
-				j("ul#shares_list").append('<li>User share with <a href="'+file_share_url+'/apps/files/?dir=/'+eprintid+'">'+j("share_with_displayname", this).text()+'</a></li>');
+				j("ul.shares_list").append('<li>User share with <a href="'+file_share_url+'/apps/files/?dir=/'+eprintid+'">'+j("share_with_displayname", this).text()+'</a></li>');
 
 		})
 	}
 	//create share (with user)
 	this.create_share = function(sw_username){
-
-		var url="/cgi/arkivum/shares";
 		var data = {eprintid: eprintid, action: 'create'};
-		if(j("input[name='share_pw']").val())
-			data.password = j("input[name='share_pw']").val();
-		if(sw_username)
-			data.username = sw_username;
-		self.ArkivumFiles_call = j.ajax( url, {data: data, dataType: "xml" } )
+		self._create_share(sw_username,data);		
+	};
+	this.create_public_share = function(e,sw_username){
+		console.log("IN CREATE PUBLIC");
+		var url="/cgi/arkivum/shares";
+		var target = j(e.target); // Clicked button element (from the modal)
+		var modal = j(target).closest('.modal'); //the modal
+
+		var data = {eprintid: eprintid, action: 'create_download'};
+		data.astorids = j(modal).data("astorids");
+
+		console.log("CALLING",url, data);
+		j.ajax( url, {data: data, dataType: "xml" } )
 		  .done(function(data) {
-	//		console.log(data);
+			console.log(data);
 		    if(j("meta > statuscode", data).text() !== "100")
-			alert("Could not create a share: "+j("meta > message", data).text());
+			console.log("Could not create a share: "+j("meta > message", data).text());
+		    else
+			j("#public_share_link").html('<a href="'+j("data > url",data).text()+'">Public share link: '+j("data > token",data).text()+'</a>');
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "create_share complete" );
+		  });
+		return false;
+
+	};
+	this._create_share = function(sw_username,data){
+		var url="/cgi/arkivum/shares";
+
+		//TODO get this data contextually as we are calling by class and there are two....
+		if(j("input[name='share_pw']")){
+			j("input[name='share_pw']").each(function(){
+				if(j(this).val()) data.password = j(this).val();
+			});
+		}
+
+//		if(j("input[name='share_pw']").val())
+//			data.password = j("input[name='share_pw']").val();
+		if(typeof sw_username === "string")
+			data.username = sw_username;
+
+		console.log("CALLING",url, data);
+		j.ajax( url, {data: data, dataType: "xml" } )
+		  .done(function(data) {
+			console.log(data);
+		    if(j("meta > statuscode", data).text() !== "100")
+			console.log("Could not create a share: "+j("meta > message", data).text());
 		    else
 			self.get_shares();
 		  })
@@ -241,15 +280,17 @@ function Arkivum(config){
 		var url="/cgi/arkivum/users";
 		j.ajax( url, {data: {username: username, action: 'get'}, dataType: "xml" } )
 		  .done(function(data) {
-//		    console.log( "success", data, username );
+		    console.log( "success", data, username );
 	  	    j(".ep_username").html(username);
 		    if(j("meta > statuscode", data).text() == "998"){
+			console.log("HAVE NOT USER");
 			j("input[name='oc_user']").val(username);
-			j("#have_not_oc_user").show();
-			j("#have_oc_user").hide();
+			j(".have_not_oc_user").show();
+			j(".have_oc_user").hide();
 		    }else{
-			j("#have_oc_user").show();
-			j("#have_not_oc_user").hide();
+			console.log("HAVE USER");
+			j(".have_oc_user").show();
+			j(".have_not_oc_user").hide();
 		    }
 
 		  })
@@ -262,17 +303,20 @@ function Arkivum(config){
 
 	};
 	this.render_user = function(){
-		j("p#oc_user").html( );
+		j("p.oc_user").html( );
 		j(self.shares).each(function(i){
-			j("ul#shares_list").append('<li><a href="'+file_share_url+'/'+j("token", this).text()+'">'+j("token", this).text()+'</a></li>');
+			j("ul.shares_list").append('<li><a href="'+file_share_url+'/'+j("token", this).text()+'">'+j("token", this).text()+'</a></li>');
 		})
 	}
 	this.create_user = function(){
 
 		var url="/cgi/arkivum/users";
 		var data = {action: 'create', username: username};
-		if(j("input[name='oc_pw']").val())
-			data.password = j("input[name='oc_pw']").val();
+		if(j("input[name='oc_pw']")){
+			j("input[name='oc_pw']").each(function(){
+				if(j(this).val()) data.password = j(this).val();
+			});
+		}
 		j.ajax( url, {data: data, dataType: "xml" } )
 		  .done(function(data) {
 		    if(j("meta > statuscode", data).text() !== "100")
@@ -315,6 +359,19 @@ function Arkivum(config){
 			return false;
 		return true;
 	}
+	this.downloadable = function(node){
+	        if(node.isFolder()) return false;
+		//I'll workout bit gates another time
+		if(self.user.staffonly)
+			return true;
+		if(j.inArray(self.user.type,["validuser","staffonly"])>=0  && j.inArray(node.data.doc_md.security,["public","validuser"])>=0)
+			return true;
+		if(j.inArray(self.user.type,["public","validuser","staffonly"])>=0 && j.inArray(node.data.doc_md.security,["public"])>=0)
+			return true;
+
+		return false;
+	}
+
 /*
 	this.ingest_file = function(e){
 	    	var target = j(e.target); // Clicked button element
@@ -438,9 +495,9 @@ function Arkivum(config){
 	this.show_modal = function(md, files){
 		var data = {"astorids": []};
 		var files_display = j("<ul></ul>");
-		//console.log(files);
+		console.log(files);
 		files.forEach(function(node){
- 		//     console.log(node);
+ 		     console.log(node);
 		     if(node.isFolder()) return false;
 		     data.astorids.push(node.key);
 		     li = j("<li>"+node.data.astor_md.name+": </li>");
@@ -448,6 +505,7 @@ function Arkivum(config){
 		     j(files_display).append(li);
 
 		});
+		console.log(j("#"+md+"_modal"));
 		j('#'+md+'_modal').modal('show').data(data);
 		j('#'+md+'_modal').on('shown.bs.modal', function () {
 			j(".modal_filename").html(files_display);
@@ -537,6 +595,12 @@ function Arkivum(config){
 
 		return delete_span;
 	};
+	this.render_download = function(node){
+		var download_span ="";
+		if(self.downloadable(node))
+			download_span = j('<span class="glyphicon glyphicon-cloud-download"></span>');
+		return download_span;
+	};
 
 	this.render_link = function(node, md, content){
 		if(self.page_type !== "dynamic"){
@@ -547,8 +611,15 @@ function Arkivum(config){
 		return link;
 	};
 
+	this.render_download_link = function(node, md, content){
+		var link = j('<a href="#" class="do_'+md+'" data-key="'+node.key+'"></a>');
+		j(link).append(content);	
+		return link;
+	};
+
 	
 	this.init_buttons = function(){
+//		console.log("############ INIT_BUTTONS #################");
 		j("#ft_expand_all").on("click", function(){
 		   j("#file_tree").fancytree("getTree").visit(function(node){
 		    	node.setExpanded(true);
@@ -573,9 +644,11 @@ function Arkivum(config){
 		  });
 		return false;
 		});
-		j("#oc_create_share").on("click", self.create_share);
-		j("#oc_create_user").on("click", self.create_user);
-		j("#oc_create_user_share").on("click", self.create_user_share);
+		j("#download_share .oc_create_public_share").on("click", self.create_public_share);
+		j("#upload_share .oc_create_share").on("click", self.create_share);
+
+		j(".oc_create_user").on("click", self.create_user);
+		j(".oc_create_user_share").on("click", self.create_user_share);
 
 		//delete file from arkivum (if still in ingest-held)
 		j("#batch_update_delete").on("click",function(){
@@ -639,6 +712,21 @@ function Arkivum(config){
   		  	j(this).datepicker('hide');
 			j(this).show();
 		});
+
+
+		//interface to do download
+		j("#batch_do_download").on("click",function(){
+//			self.show_modal("download", j("#file_tree").fancytree("getTree").getSelectedNodes());
+			self.show_modal("download", j.grep(j("#file_tree").fancytree("getTree").getSelectedNodes(),function(node,i){ if(self.downloadable(node)) return node;}));
+			return false;
+		});
+		j(".do_download").on("click",function(){
+			console.log("key: ",j(this).data("key"));
+			self.show_modal("download", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+//		j('#download_submit').on('click', {md: "download", selector: "#download"},self.create_share);
+
 /* not used
 		//update the security if embargo is set
 		j("#date_embargo_year").on("keyup",function(){
@@ -725,7 +813,7 @@ j(document).ready(function(){
 	console.log("eprintid: ", eprintid);
 	var page_type = "dynamic";
 	var eprint_regex = /\/(\d+)(?:\/)$/;
-	if((typeof eprintid == undefined || eprintid == null) && document.location.pathname.match(eprint_regex)!=null){
+	if((typeof eprintid == undefined || eprintid == null || eprintid === "NO_EPRINTID") && document.location.pathname.match(eprint_regex)!=null){
 		//Looks like an abstract...
 		eprintid = document.location.pathname.match(eprint_regex)[1];
 		page_type = "static";
@@ -738,7 +826,7 @@ j(document).ready(function(){
 	console.log("eprintid: ", eprintid);
 
 
-	if((typeof eprintid === "undefined" || eprintid === null) && j.urlParam("stage") !== "files"){
+	if((typeof eprintid === "undefined" || eprintid === null || eprintid === "NO_EPRINTID") && j.urlParam("stage") !== "files"){
 		console.log("NO");
 		return;
 	}

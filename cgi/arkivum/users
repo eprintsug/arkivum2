@@ -9,12 +9,12 @@ my $action = $repository->param("action");
 my $password = $repository->param("password") || undef;
 
 
-die("Scared of characters in: $username") unless($username=~ /^[A-Z a-z 0-9 \.\-]+$/);
+die("Scared of characters in: $username") unless($username=~ /^[A-Z a-z 0-9 \.\-_]+$/);
 die("Action is not known: $action") unless(grep $_ eq $action, qw(get create));
 
 if($action eq "create"){
 
-	die("Scared of characters in password") unless(defined $password && $password=~ /^[A-Z a-z 0-9 \.\-]+$/);
+	die("Scared of characters in password: $password") unless(defined $password && $password=~ /^[A-Za-z0-9\.\-]+$/);
 
 	my $data = {userid => $username,
 		    password => $password};

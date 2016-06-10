@@ -72,7 +72,7 @@ sub _arkivum_to_json
 	my $repo = $self->{repository};
 	#Request to Arkivum API here when possible
 	#here we have eprint and arkivum data and we will merge them into a fancytree ready json structure
-	my $files = {title => $self->phrase("root_folder").EPrints::XML::to_string($eprint->render_citation("screen")), key => "ROOT", folder => "true", children => [] };
+	my $files = {title => $self->phrase("root_folder").EPrints::XML::to_string($eprint->render_citation("screen")), key => "ROOT", folder => "true", expanded => "true", children => [] };
 	#This will come from arkivum api...
 #	my $file_info = $self->_astor_getFileInfo();
 	my $json = $self->_astor_getFolder($eprint->get_id);
