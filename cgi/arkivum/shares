@@ -16,11 +16,11 @@ die("Action is not known: $action") unless(grep $_ eq $action, qw(get create));
 
 if($action eq "create"){
 
-	my $data = {path => $repository->get_conf("arkivum", "symlink")."/".$eprintid, 
+	my $data = {path => $repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid, 
 				shareType => 3, #publiclink
 				publicUpload => "true", 
 				permissions => 31 }; #all
-	#A public link with a password, passowrds may be mandatory depending on OC config
+	#A public link with a password, passwords may be mandatory depending on OC config
 	$data->{password} = $password if(defined $password);
 	
 	#A share with a specific user
@@ -34,7 +34,7 @@ if($action eq "create"){
 }
 
 if($action eq "get"){
-	print _oc_getRequest("/shares?path=".$repository->get_conf("arkivum", "symlink")."/".$eprintid);
+	print _oc_getRequest("/shares?path=".$repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid);
 }
 
 sub _oc_getRequest
@@ -44,7 +44,6 @@ sub _oc_getRequest
 	my $oc_server = $repository->get_conf("arkivum", "file_share_api");
 
 	my $server_url = $oc_server . $url;
-	print STDERR $server_url."\n";
 	my $ua       = LWP::UserAgent->new();
 	#$ua->credentials( $server_url, 'Basic', 'astoradmin', 'arkivum');
 	print STDERR "GET: ".$server_url."\n";

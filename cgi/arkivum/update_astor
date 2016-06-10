@@ -1,0 +1,97 @@
+#!/usr/bin/perl
+
+use EPrints;
+use URI::Escape;
+use JSON;
+use Switch;
+
+my $repository = EPrints->new->current_repository;
+my $eprintid = $repository->param("eprintid");
+my @astorids = $repository->param('astorids[]');      
+my @checksums = $repository->param('checksums[]');      
+my @sizes = $repository->param('sizes[]');#naff
+my $action = $repository->param("action");
+
+
+die("EPrintid is malformed: $eprintid") unless($eprintid=~ /^\d+$/);
+die("Action is not known: $action") unless(grep $_ eq $action, qw(ingest delete));
+
+my $eprint = EPrints::DataObj::EPrint->new( $repository, $eprintid );
+
+#		// POST /api/2/files/release/{filepath}
+
+#TODO check permissions!!
+#Lets modify the document md
+for my $doc($eprint->get_all_documents){
+	next if(!$doc->is_set("astorid")); #ignore local documents
+	print STDERR $doc->value("astorid")." ===> ".join(" - ", @astorids)."\n";
+
+	next if(!grep $_ eq $doc->value("astorid"), @astorids); #ignore unselected docs
+	
+	_astor_delete($eprint->get_id."/".$doc->value("main")) if($action eq "delete");
+	if($action eq "ingest"){
+		print STDERR "INGESTING...\n";
+		#obvious nonsense ahead:
+		my $data = {size => $sizes[0], checksum => $checksums[0], checksumAlgorithm => "md5", compressionAlgorithm => ""};
+		_astor_releaseForIngest($eprint->get_id."/".$doc->value("main"), $data);
+	}
+}
+
+
+## Return json for all documents
+my $plugin = $repository->plugin( "Export::ArkivumFiles" );
+my $list = $repository->get_dataset("document")->search(filters => [
+				{ meta_fields => [qw( eprintid )], value => $eprintid },
+			]);
+$plugin->initialise_fh( \*STDOUT );	
+$repository->send_http_header( "content_type"=>$plugin->param("mimetype") );
+#$plugin->output_list( fh=>\*STDOUT, list=>$list );
+print $plugin->output_dataobj( $eprint );
+
+
+
+sub _astor_releaseForIngest
+{
+      my( $path, $data) = @_;
+
+      my $file_share_folder = $repository->get_conf("arkivum", "file_share_folder");
+
+      my $api_url = "/api/2/files/release/".$file_share_folder."/".uri_escape($path);
+      
+      my $ark_server = $repository->get_conf("arkivum", "archive_api");
+
+      my $server_url = $ark_server . $api_url;
+      print STDERR "POST: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -H \"Accept: application/json\" -H \"Content-Type: application/json\" -X POST \"$server_url\" ";
+	$curl_cmd .=" -d '".encode_json($data)."'";
+	print STDERR $curl_cmd."\n";
+#	system($curl_cmd)==0 or return 0;
+	return 1;
+     
+}
+
+sub _astor_delete
+{
+      my( $path) = @_;
+
+      my $file_share_folder = $repository->get_conf("arkivum", "file_share_folder");
+
+      my $api_url = "/files/".$file_share_folder."/".uri_escape($path);
+      
+      my $ark_server = $repository->get_conf("arkivum", "archive_api");
+
+      my $server_url = $ark_server . $api_url;
+      print STDERR "DELETE: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X DELETE \"$server_url\" ";
+#	while(my($k,$v) = each %{$data}){
+#		$curl_cmd .=" -d ".$k."=".$v;
+#	}
+#	print STDERR $curl_cmd."\n";
+	system($curl_cmd)==0 or return 0;
+	return 1;
+     
+}
+
+

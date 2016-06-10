@@ -10,14 +10,21 @@ $arkivum->{file_share_password} = "arkivum";
 
 $arkivum->{file_share_api} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/ocs/v1.php/apps/files_sharing/api/v1";
 $arkivum->{file_share_url} = "https://".$arkivum->{file_share_host}."/index.php";
-$arkivum->{'symlink'} = "symlink_to_astor"; #Must exist and be symlinked to file_share platform
 $arkivum->{oc_users_api} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/ocs/v1.php/cloud";
 
 $arkivum->{default_document_security} = "public";
 $arkivum->{default_document_license} = "cc_by_nd";
+$arkivum->{default_document_format} = "text"; #TODO add to updatable set of doc_md
 
-#This is actually just a sub dir in this case
-$arkivum->{datapool} = "owncloud_astoradmin";
+#checksumAlgorithm (astor default md5)
+$arkivum->{checksumAlgorithm} = "md5";
+
+#What Owncloud calls it
+#This is the folder name of the external storage location (type==local) configured in on the owncloud external storage app
+$arkivum->{ext_storage_name} = "arkivum"; 
+#What arkivum calls it
+#This is the path from the astor root to the "configurtion" set in the owncloud external storage app
+$arkivum->{file_share_folder} = "owncloud_datapool";
 
 #NOT USED #TODO remove this and pm
 $c->{plugins}->{"Screen::EPrint::UploadMethod::Arkivum"}->{params}->{disable} = 1;
@@ -36,6 +43,9 @@ $arkivum->{libs} = {
 			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/jquery.fancytree-all.min.js",
 			"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
 			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/skin-bootstrap/ui.fancytree.min.css",
+			"https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.js",
+			"https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.6.1/js/bootstrap-datepicker.min.js",
+			"https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.6.1/css/bootstrap-datepicker.min.css",
 			#NB this is not a CDN!
 #			"http://wwwendt.de/tech/fancytree/src/jquery.fancytree.persist.js",
 			],

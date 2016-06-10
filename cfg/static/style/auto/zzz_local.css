@@ -46,8 +46,9 @@ div.share_panel {
 #create_oc_user { display: none; }
 #have_oc_user { display: none; }
 .ep_username { font-weight: bold; }
-
+.ark_ingest { float: right; }
 #file_tree td {text-align: center;}
+#file_tree th {text-align: center;}
 #file_tree td.ft_left{ text-align: left;}
 .license { display: inline-block; width: 80px; height: 15px; background-size: 80px 15px;}
 .cc_by { background-image: url("images/cc_by.png");}
@@ -61,4 +62,8 @@ div.share_panel {
 .red {color: #c00;}
 .amber {color: #ffbf00;}
 .green {color: #0c0;}
+.not_set {color: #ccc; opacity: 0.7; font-weight: bold;}
+.batch_options {float: right; font-size: 1.2em;}
+.batch_options span {font-size: 1.3em;}
 
+.ep_tm_page_content { border: none;}

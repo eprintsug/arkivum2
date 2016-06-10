@@ -63,22 +63,24 @@ function Arkivum(config){
 	//Call export on the ArkivumFiles Plugin, if an item folder doesn't already exist it will do after this
 	this.get_files_data = function(in_loop=false){
 		var url="/cgi/export/eprint/"+eprintid+"/ArkivumFiles/"+repoid+"-eprint-"+(new Date).getTime()+".js";
-		console.log("url", url);
+		//console.log("url", url);
 		self.ArkivumFiles_call = j.ajax( url )
 		  .done(function(data) {
-		    console.log( "success", data, in_loop );
-	//JSON.stringify comparison reports constant change after actual change. I imagine that the object is too complex for simpler comparison :(
+		    //console.log( "success", data, in_loop );
+		//JSON.stringify comparison reports constant change after actual change. I imagine that the object is too complex for simpler comparison :(
 		//Ideally something like this would allow us to pick changes to the astor_md (or doc_md) for each child but...
 //		    if(in_loop && JSON.stringify(data.children) !== JSON.stringify(self.files_data.children)){
 		//This will only trigger if a file has been added or removed
 		    if(in_loop && data.children.length != self.files_data.children.length){
 			//change detected reload tree with new data
-			    j("#file_tree").fancytree("getTree").reload([data]);
+			j("#file_tree").fancytree("getTree").reload([data]);
+			//no need to init_buttons again here...
 		    }
 
 		    self.files_data = data;
 		    if(!in_loop){
 			//initial tree render:
+			console.log("INIT FILE DATA",data);
 		 	self.render_file_tree();
 		    }
 		    setTimeout(self.get_files_data, 5000, true);
@@ -96,7 +98,7 @@ function Arkivum(config){
 		
 		j("#file_tree").fancytree({
 		  //TODO plug source in from TSWS
-		  source: [self.files_data ],
+		  source: [self.files_data],
 		  extensions: ["glyph", "wide", "persist", "table"],
 		  glyph: glyph_opts,
 		  checkbox: true,
@@ -121,32 +123,45 @@ function Arkivum(config){
         	checkboxColumnIdx: 1,
         	nodeColumnIdx: 2
       		},
- 		renderColumns: function(event, data) {
-			var node = data.node,
-		  	tdList = j(node.tr).find(">td");
-			tdList.eq(0).text(node.getIndexHier());
-			if(node.isFolder()) return true;
-			tdList.eq(3).html('<span class="license '+node.data.doc_md.license+'"></span>');
-			if(node.data.doc_md.security == "validuser")
-				tdList.eq(4).html('<span class="glyphicon glyphicon-user"></span>');
-			if(node.data.doc_md.security == "staffonly")
-				tdList.eq(4).html('<span class="glyphicon glyphicon-lock"></span>');
-
-			if(node.data.doc_md.date_embargo != undefined && node.data.doc_md.security === "public")
-				tdList.eq(5).html('<span class="glyphicon glyphicon-exclamation-sign amber"></span> security is still public');
-			else if(node.data.doc_md.date_embargo != undefined)
-				tdList.eq(5).html(node.data.doc_md.date_embargo);
-
-			tdList.eq(6).html('<span class=""> '+node.data.astor_md.ingestState+'</span>');
-			tdList.eq(7).html('<span class="glyphicon glyphicon-hdd '+node.data.astor_md.replicationState+'"></span>');
-			var accessed = node.data.astor_md.accessed.split(/T/);
-			tdList.eq(8).html('<span class="astor_accessed">'+accessed[0]+'</span>');
-
-	      },
+ 		renderColumns: self.render_columns,
+		init: function(){
+			self.file_tree = j("#file_tree").fancytree("getTree");
+		},
+		
            });	
 	   self.init_buttons();
 	};
+	this.render_columns = function(event,data){
+	
+		var node = data.node,
+		tdList = j(node.tr).find(">td");
+		tdList.eq(0).text(node.getIndexHier());
+		if(node.isFolder()) return true;
 
+		tdList.eq(3).html(self.render_size(node));
+
+		tdList.eq(4).html('<span class="glyphicon glyphicon-hdd '+node.data.astor_md.replicationState+'"></span>');
+		var accessed = node.data.astor_md.accessed.split(/T/);
+		tdList.eq(5).html('<span class="astor_accessed">'+accessed[0]+'</span>');
+		tdList.eq(6).html(' :: ');
+
+		//EPrints doc md	
+		tdList.eq(7).html(self.render_link(node,"license",self.render_license(node)));
+		tdList.eq(8).html(self.render_link(node,"security",self.render_security(node)));
+		tdList.eq(9).html(self.render_link(node,"date_embargo",self.render_date_embargo(node)));
+
+		if(!self.ingested(node)){
+			tdList.eq(10).html(self.render_link(node,"ingest",self.render_ingest(node)));
+			tdList.eq(11).html(self.render_link(node,"delete",self.render_delete(node)));
+
+		}else{
+			tdList.eq(10).html(self.render_ingest(node));
+			tdList.eq(11).html(self.render_delete(node));
+		}
+	      };
+	//******************************
+	// File share API interaction
+	//*****************************
 
 	//Check for shares that already exist for this item
 	this.get_shares = function(){
@@ -174,9 +189,9 @@ function Arkivum(config){
 			if(j("share_type", this).text() == "0") //user
 				j("ul#shares_list").append('<li>User share with <a href="'+file_share_url+'/apps/files/?dir=/'+eprintid+'">'+j("share_with_displayname", this).text()+'</a></li>');
 
-//			index.php/apps/files/?dir=%2F
 		})
 	}
+	//create share (with user)
 	this.create_share = function(sw_username){
 
 		var url="/cgi/arkivum/shares";
@@ -261,11 +276,44 @@ function Arkivum(config){
 		return false;
 	};
 
-	this.update_md = function(){
+	//********************************
+	// File metadata updating 
+	//*******************************
+	//is a file ingested into Arkivum?
+	this.ingested = function(node){
+/*
+		    SYNC,            // File is on synchronized storage
+		    UNINIT,          // Uninitialised (for backward compatibility)
+		    PRIMARY_IP,      // primary ingest in progress
+		    PRIMARY,       // primary ingest completed
+		    SECONDARY_IP,    // secondary ingest in progress
+		    SECONDARY,     // secondary ingest completed
+		    FINAL,          // file has been fully ingested
+		    PENDING, // file added to the pending archive package
+		    ARCHIVED   // file added to a closed archive package
+*/
+
+		if(j.inArray(node.data.astor_md.ingestState,["NOTINGESTED","SYNC","UNINIT","PRIMARY_IP","PRIMARY"])>=0)
+			return false;
+		return true;
+	}
+/*
+	this.ingest_file = function(e){
+	    	var target = j(e.target); // Clicked button element
+
+		j(target).closest('.modal').on('hidden.bs.modal', function () {
+			console.log("Time to ingest ", j(this).data("key"));
+			var node = j("#file_tree").fancytree("getTree").getNodeByKey(j(this).data("key"));
+			console.log("NODE: ",node.data.astor_md.name);
+			var url = "/cgi/arkivum/ingest";
+			var data = {astorid: j(this).data("key"), md5sum: "??", size: "??",checksumAlgorithm: "", compressionAlgorithm: "" };
+
+			j(this).unbind('hidden.bs.modal');
+	    	});
+
+	};
+	this.ark_ingest = function(){
 		var data = {};
-		j(".document_md_input").each(function(){
-		     data[this.name]= this.value;
-		});
 		data.astorids = [];
 		j("#file_tree").fancytree("getTree").getSelectedNodes().each(function(node){
 		     if(node.isFolder()) return false;
@@ -273,11 +321,13 @@ function Arkivum(config){
 		});
 
 		data.eprintid = eprintid;
-		var url = "/cgi/arkivum/update_doc_md";
+		var url="/cgi/arkivum/ingest";
+
 		j.ajax( url, {data: data, dataType: "json" } )
 		  .done(function(data) {
 		    console.log( "success", data );
 		    j("#file_tree").fancytree("getTree").reload([data]);
+		    self.init_buttons();
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
@@ -287,7 +337,193 @@ function Arkivum(config){
 		  });
 	
 		return false;
+	};
+*/
+	this.update_astor = function(e){
+		var target = j(e.target); // Clicked button element (from the modal)
+		var modal = j(target).closest('.modal'); //the modal
+		var data = {};
+		//value to update passed as event data
+		data[e.data.md]=j(e.data.selector).val();
+		//TODO this better:
+		if(data.action === "ingest"){
+			//TODO interface for getting hold of checksums and sizes
+			//TODO handle multiple checksums
+			data.checksums = [j("#ingest_checksum",modal).val()];	
+			//TODO handle multiple sizes
+			data.sizes = [7];
+			//This is a cheap trick to show that ingest has been requested (NB won't work for batches)
+			j(modal).on('hidden.bs.modal', function () {
+				console.log("KEY:",j(this).data("astorids")[0],this);
+				var node = j("#file_tree").fancytree("getTree").getNodeByKey(j(this).data("astorids")[0]);
+				console.log(j(target));
+//				j(target).parentd").html(self.render_ingest(node,true));
+	    		});
+
+		}
+		//array of astorids
+		data.astorids = j(modal).data("astorids");
+		self._update_astor(data);
+
+	};
+	this._update_astor = function(data){
+		//the eprintid
+		data.eprintid = eprintid;
+
+		var url = "/cgi/arkivum/update_astor";
+		console.log("DATA TO update_astor: ",data);
+		j.ajax( url, {data: data } )
+		  .done(function(data) {
+		    j("#file_tree").fancytree("getTree").reload([data]);
+		    self.init_buttons();
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "update_astor complete" );
+		  });
+	
+//		return false;
+	};
+
+	this.update = function(e){
+		var target = j(e.target); // Clicked button element (from the modal)
+		var modal = j(target).closest('.modal'); //the modal
+		var data = {};
+		//value to update passed as event data
+		data[e.data.md]=j(e.data.selector).val();
+		//array of astorids
+		data.astorids = j(modal).data("astorids");
+		//the eprintid
+		self._update(data);
+
+	};
+	this._update = function(data){
+		data.eprintid = eprintid;
+
+		var url = "/cgi/arkivum/update_doc_md";
+		//console.log("DATA TO update_doc_md: ",data);
+		j.ajax( url, {data: data, dataType: "json" } )
+		  .done(function(data) {
+		    j("#file_tree").fancytree("getTree").reload([data]);
+		    self.init_buttons();
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "update complete" );
+		  });
 	}
+
+	this.show_modal = function(md, files){
+		var data = {"astorids": []};
+		var files_display = j("<ul></ul>");
+		//console.log(files);
+		files.forEach(function(node){
+ 		//     console.log(node);
+		     if(node.isFolder()) return false;
+		     data.astorids.push(node.key);
+		     li = j("<li>"+node.data.astor_md.name+": </li>");
+		     j(li).append(eval("self.render_"+md+"(node)"));
+		     j(files_display).append(li);
+
+		});
+		j('#'+md+'_modal').modal('show').data(data);
+		j('#'+md+'_modal').on('shown.bs.modal', function () {
+			j(".modal_filename").html(files_display);
+			console.log(files.length,files[0].data.doc_md[md])
+			if(files.length == 1 && files[0].data.doc_md[md] != undefined){
+				j("option[value='"+files[0].data.doc_md[md]+"']",this).prop("selected",true);
+				j("input[value='"+security+"']",this).prop("checked",true);
+			}
+
+		});
+
+		return false;
+	};
+	//*****************************
+	// Render the metadata (icons)
+	//*****************************
+	this.render_size = function(node){
+		var size_span = j('<span>'+node.data.astor_md.size+'</span>');
+		
+		return size_span;
+	};
+
+	this.render_security = function(node){
+
+		var security_span=j('<span class="glyphicon"></span>');
+		security = false;
+		if(node)
+			security = node.data.doc_md.security;
+		switch(security) {
+		    case "staffonly":
+			j(security_span).addClass("red glyphicon-lock").attr("title","Restricted to repository staff only");
+			break;
+    		    case "validuser":
+			j(security_span).addClass("amber glyphicon-user").attr("title","Restricted to registered users only");
+        		break;
+		    case "public":
+			j(security_span).addClass("green glyphicon-globe").attr("title","Accessible by all");
+			break;
+		    default : 
+			j(security_span).addClass("glyphicon-lock");
+		}
+		return security_span;
+	};
+
+	this.render_license = function(node){
+		var license_span = j('<span class="license '+node.data.doc_md.license+'"></span>');
+
+		if(self.getCSS("backgroundImage",node.data.doc_md.license)=="none"){
+			j(license_span).html(node.data.doc_md.license);
+//			//phrase is available from doing the below... but too long in this context
+//			//self.set_phrase("licenses_typename_"+node.data.doc_md.license,license_span);
+		}
+		return license_span;
+	};
+
+	this.render_date_embargo = function(node){
+		var date_embargo_span = j('<span class="date_embargo not_set">No embargo</span>');
+
+
+		if(node.data.doc_md.date_embargo != undefined){
+			j(date_embargo_span).html(node.data.doc_md.date_embargo).removeClass("not_set");
+			if(node.data.doc_md.security === "public")
+				j(date_embargo_span).append('<span class="glyphicon glyphicon-exclamation-sign amber"></span> security is still public');
+		}
+		return date_embargo_span;
+	};
+	this.render_ingest = function(node,requested){
+		var ingest_span = j('<span class="glyphicon glyphicon-import"></span>');
+		if(!self.ingested(node))
+			j(ingest_span).addClass("red");
+		if(requested)
+			j(ingest_span).addClass("amber");
+		if(self.ingested(node))
+			j(ingest_span).addClass("green");
+
+		return ingest_span;
+	};
+	this.render_delete = function(node){
+		var delete_span = j('<span class="glyphicon"></span>');
+		if(!self.ingested(node))
+			j(delete_span).addClass("glyphicon-trash");
+		else
+			j(delete_span).addClass("glyphicon-ban-circle red");
+
+		return delete_span;
+	};
+
+	this.render_link = function(node, md, content){
+		var link = j('<a href="#" class="update_'+md+'" data-key="'+node.key+'"></a>');
+		j(link).append(content);	
+		return link;
+	};
+
+	
 	this.init_buttons = function(){
 		j("#ft_expand_all").on("click", function(){
 		   j("#file_tree").fancytree("getTree").visit(function(node){
@@ -316,7 +552,71 @@ function Arkivum(config){
 		j("#oc_create_share").on("click", self.create_share);
 		j("#oc_create_user").on("click", self.create_user);
 		j("#oc_create_user_share").on("click", self.create_user_share);
-		j("#update_md").on("click", self.update_md);
+
+		//delete file from arkivum (if still in ingest-held)
+		j("#batch_update_delete").on("click",function(){
+			//apply filter for ingested things for this and delete
+			self.show_modal("delete", j.grep(j("#file_tree").fancytree("getTree").getSelectedNodes(),function(node,i){ if(!self.ingested(node)) return node;}));
+			return false;
+		});
+		j(".update_delete").on("click",function(){
+			self.show_modal("delete", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+		j('#delete_submit').on('click',{md: "action", selector: "#delete"}, self.update_astor);
+
+		//ingest file to arkivum (release from ingest-held)
+		j("#batch_update_ingest").on("click",function(){
+			//apply filter for ingested things for this and delete
+			self.show_modal("ingest", j.grep(j("#file_tree").fancytree("getTree").getSelectedNodes(),function(node,i){ if(!self.ingested(node)) return node;}));
+			return false;
+		});
+		j(".update_ingest").on("click",function(){
+			self.show_modal("ingest", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+		j('#ingest_submit').on('click',{md: "action", selector: "#ingest"}, self.update_astor);
+
+		//interface to update security
+		j("#batch_update_security").on("click",function(){
+			self.show_modal("security", j("#file_tree").fancytree("getTree").getSelectedNodes());
+			return false;
+		});
+		j(".update_security").on("click",function(){
+			self.show_modal("security", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+		j('#security_submit').on('click',{md: "security", selector: "#security_modal input[name='security']:checked"}, self.update);
+		
+		//interface to update license
+		j("#batch_update_license").on("click",function(){
+			self.show_modal("license", j("#file_tree").fancytree("getTree").getSelectedNodes());
+			return false;
+		});
+		j(".update_license").on("click",function(){
+			console.log("key: ",j(this).data("key"));
+			self.show_modal("license", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+		j('#license_submit').on('click', {md: "license", selector: "#license_modal option:selected"},self.update);
+		
+		//interface to update embargo date
+		j('#batch_update_date_embargo').on("click", function(){
+			self.show_modal("date_embargo", j("#file_tree").fancytree("getTree").getSelectedNodes());
+			return false;
+		});
+		j(".update_date_embargo").on("click",function(){
+			self.show_modal("date_embargo", [self.file_tree.getNodeByKey(j(this).data("key"))]);
+			return false;
+		});
+		j('#date_embargo_submit').on('click',{md: "date_embargo", selector:"#date_embargo"},self.update);
+
+		j('#date_embargo').datepicker({format: 'yyyy-mm-dd'}).on('changeDate', function(ev){
+  		  	j(this).datepicker('hide');
+			j(this).show();
+		});
+/* not used
+		//update the security if embargo is set
 		j("#date_embargo_year").on("keyup",function(){
 			console.log("changed", j(this).val());
 			if(j(this).val().match(/\d{4}/)){
@@ -326,7 +626,46 @@ function Arkivum(config){
 				j("#security").val("public");
 			}
 		});
+*/
+	}; //end init_buttons
+
+	//************************
+	// Util functions
+	//************************
+	this.get_value = function(key,field){
+		var node_data = self.file_tree.getNodeByKey(key).data;
+		if(node_data.doc_md[field] != undefined)
+			return node_data.doc_md[field];
+
+		if(node_data.astor_md[field] != undefined)
+			return node_data.astor_md[field];
+
 	};
+	this.getCSS = function (prop, fromClass) {
+		var inspector = j("<div>").css('display', 'none').addClass(fromClass);
+		j("body").append(inspector); // add to DOM, in order to read the CSS property
+		try {
+			return inspector.css(prop);
+		} finally {
+			inspector.remove(); // and remove from DOM
+		}
+	};
+	this.set_phrase = function(phraseid, selector, context){
+		var url="/cgi/arkivum/get_phrase";
+		if(context == undefined) context = document;
+		j.ajax( url, {data : {phraseid: phraseid}, dataType: "json" } )
+		  .done(function(data) {
+			j(selector, context).html(data[phraseid]);
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "set_phrase complete" );
+		  });
+
+	};
+	//boot...
 	self.init();
 }
 

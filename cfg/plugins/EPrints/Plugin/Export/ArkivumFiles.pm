@@ -76,39 +76,26 @@ sub _arkivum_to_json
 	#This will come from arkivum api...
 #	my $file_info = $self->_astor_getFileInfo();
 	my $json = $self->_astor_getFolder($eprint->get_id);
-	print STDERR $json."\n";
+#	print STDERR $json."\n";
 	if($json =~ /^404/){
 		$self->_log("Could not create folder") unless $self->_astor_createFolder($eprint->get_id);
 		$json = $self->_astor_getFolder($eprint->get_id);
 	}
 
-
-#	my $astor_files = [{'pcks-nfsf-3f9d20-i2n0'=> { }}, {'dvon-pueb-v49bpw-uv94' => { }} ];
-
-	#FORNOW get this from local file /tmp/linnsoc.json which is stuffed full of bonafide arkivum json
-	#open( my $fh, '<', '/tmp/linnsoc.json' );
-	#my $json_text   = <$fh>;
-	#my $astor_files = decode_json( $json_text );
-
-	#if(defined $self->{session}->param("path")){
-	#	open( my $fh, '<', '/tmp/linnsoc_'.$self->{session}->param("path").'.json' );
-	#	$json_text   = <$fh>;
-	#	$astor_files = decode_json( $json_text );
-	#}	
 	#merge/sync astor and eprints file metadata... possibly we will do this elsewhere so it is no attempted at every export...  
 	#but maybe doing it here is the best way to ensure a reliable picture
-	print STDERR $json." **\n";
 	my $ft_files = [];
 	for my $f (@{$json->{files}}){
+	#	print STDERR $f->{type}." **\n";
+
 		if($f->{type} =~ /^Folder$/){
 			push @$ft_files, {title=>$f->{name}, key=>$f->{id}, folder=>"true", children=> [] };
 		}else{
-			my $file_key = $f->{path}; #key is default path as id not always available
+			my $file_key = Digest::MD5::md5_hex($f->{path}); #key is default path as id not always available
 			$file_key = $f->{id} if(defined $f->{id});
 			push @$ft_files, {title=>$f->{name}, key=>$file_key, astor_md => $f, doc_md => 0 };
 			#make file metadata from astor easily referencable by astorid
 		}
-
 	}
 	#loop through existing documents and merge metadata from the astor and eprints
 	for my $doc($eprint->get_all_documents){
@@ -116,14 +103,14 @@ sub _arkivum_to_json
 		if($doc->is_set("astorid")){
 			#We have a file we need to merge with arkivum data
 			#encode as json and
-			print STDERR "ASTORID: ".$doc->value("astorid")."\n";
+#			print STDERR "ASTORID: ".$doc->value("astorid")."\n";
 			my ($ft_file) = grep { $_->{key} eq $doc->value("astorid") } @$ft_files;
-			print STDERR "FT_FILE - name : ".$ft_file->{title}."\n";
-			print STDERR "FT_FILE - doc_md : ".$ft_file->{doc_md}."\n";
+#			print STDERR "FT_FILE - name : ".$ft_file->{title}."\n";
+#			print STDERR "FT_FILE - doc_md : ".$ft_file->{doc_md}."\n";
 			if(defined $ft_file){
 				#merge existing sets of metadata 
 				# (may need to process a subset of doc_md rather than shoce in the lot as below)
-				print STDERR "Merging $ft_file and ".$doc->{data}."\n";
+#				print STDERR "Merging $ft_file and ".$doc->{data}."\n";
 				$ft_file->{doc_md} = $doc->{data};
 			}else{
 				#remove the eprints doc metadata as file no longer on astor...
@@ -136,39 +123,20 @@ sub _arkivum_to_json
 	my @files_with_no_md = grep { $_->{folder} ne "true" && $_->{doc_md} == 0 } @$ft_files;
 	for my $ft_file (@files_with_no_md){
 		print STDERR "FILENAME: ".$ft_file->{title}."\n";
+#		print STDERR "MD5: ".$ft_file->{astor_md}->{MD5checksum}."\n"; #almost certain not to have this at this stage
+
 		my $epdata = {eprintid => $eprint->get_id, 
 				astorid=> $ft_file->{key}, 
 				security=> $repo->get_conf("arkivum", "default_document_security"),
-				license=>  $repo->get_conf("arkivum", "default_document_license"),
+				license=> $repo->get_conf("arkivum", "default_document_license"),
+				format=> $repo->get_conf("arkivum", "default_document_format"),
+				main=> $ft_file->{title},
 			 };
 		$epdata->{eprintid} = $eprint->get_id;
 		$ft_file->{doc_md} = $epdata;
 		my $doc = EPrints::DataObj::Document->create_from_data( $self->{session}, $epdata, $ds );
 		$ft_file->{doc_md} = $doc->{data};
 	}
-
-	#loop through astor_md and create any doc_md that isn't present after previous process.
-#
-#	while(my($astorid,$astor_data) = each(%{$astor_md})){
-#		next if(defined $astor_data->{doc_md});
-#		my $epdata = {eprintid => $eprint->get_id, 
-#				astorid=> $astorid, 
-#				security=> $repo->get_conf("arkivum2", "default_document_security"),
-#				license=>  $repo->get_conf("arkivum2", "default_document_license"),
-#			 }
-#		$epdata->{eprintid} = $opts{eprint}->get_id;
-#		my $doc = EPrints::DataObj::Document->create_from_data( $opts{session}, $epdata, $ds );
-#	}
-
-	#in lieu of contact with arkivum api we have to use this crap:
-#	my $ft_files =  [{title=> "Folder", key=> "1", folder=> "true", children=> [
-#		      {title=> "File", key=> "pcks-nfsf-3f9d20-i2n0"},
-#		      {title=> "File", key=> "dvon-pueb-v49bpw-uv94"}
-#	    ]},
-#	    {title=> "Folder", key=> "2", folder=> "true", children=> [
-#	      {title=> "File", key=> "wef4-33yh-43fefe3-f3ff"},
-#	      {title=> "File", key=> "wefe-tjtr-gg4gshj-egw3"}
-#	    ]}];
 
 	$files->{children} = $ft_files;
 	return encode_json $files;
@@ -180,9 +148,9 @@ sub _astor_getFileInfo
 
       my $repo = $self->{repository};
 
-      my $datapool = $repo->get_conf("arkivum", "datapool");
+      my $file_share_folder = $repo->get_conf("arkivum", "file_share_folder");
 
-      my $api_url = "/api/2/files/fileInfo/" . $datapool . $filename;
+      my $api_url = "/api/2/files/fileInfo/" . $file_share_folder . $filename;
       my $response = $self->_astor_getRequest($api_url);
 
       if ( not defined $response )
@@ -214,9 +182,9 @@ sub _astor_getFolder
 
       my $repo = $self->{repository};
 
-      my $datapool = $repo->get_conf("arkivum", "datapool");
+      my $file_share_folder = $repo->get_conf("arkivum", "file_share_folder");
 
-      my $api_url = "/files/" . $datapool ."/". $foldername;
+      my $api_url = "/files/" . $file_share_folder ."/". $foldername;
       my $response = $self->_astor_getRequest($api_url);
 
       if ( not defined $response )
@@ -248,11 +216,11 @@ sub _astor_createFolder
 
       my $repo = $self->{repository};
 
-      my $datapool = $repo->get_conf("arkivum", "datapool");
+      my $file_share_folder = $repo->get_conf("arkivum", "file_share_folder");
 
       my $api_url = "/files/";
- #     my $response = $self->_astor_postRequest($api_url,{action=>"create-folder", basePath=>"/".$datapool."/", folderName=>$foldername});
-      return $self->_astor_postRequest($api_url,{action=>"create-folder", basePath=>"/".$datapool."/", folderName=>$foldername});
+ #     my $response = $self->_astor_postRequest($api_url,{action=>"create-folder", basePath=>"/".$file_share_folder."/", folderName=>$foldername});
+      return $self->_astor_postRequest($api_url,{action=>"create-folder", basePath=>"/".$file_share_folder."/", folderName=>$foldername});
 
 =comment
       if ( not defined $response )
@@ -280,6 +248,31 @@ sub _astor_createFolder
 =cut
 }
 
+sub _astor_releaseForIngest
+{
+      my( $self, $path) = @_;
+
+      my $repo = $self->{repository};
+
+      my $file_share_folder = $self->{repository}->get_conf("arkivum", "file_share_folder");
+
+      my $api_url = "/files/release/".$path;
+      
+      my $ark_server = $self->{repository}->get_conf("arkivum", "archive_api");
+
+      my $server_url = $ark_server . $api_url;
+      print STDERR "POST: ".$server_url."\n";
+	#not ideal but...
+#	my $curl_cmd = "curl -k -X POST $server_url ";
+#	while(my($k,$v) = each %{$data}){
+#		$curl_cmd .=" -d ".$k."=".$v;
+#	}
+#	print STDERR $curl_cmd."\n";
+#	system($curl_cmd)==0 or return 0;
+#	return 1;
+     
+}
+
 
 
 
@@ -291,7 +284,7 @@ sub _astor_getRequest
 
 	my $server_url = $ark_server . $url;
 	my $ua       = LWP::UserAgent->new();
-	print STDERR "GET: ".$server_url."\n";
+#	print STDERR "GET: ".$server_url."\n";
 	my $response = $ua->get( $server_url );
 
 	return $response;

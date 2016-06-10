@@ -1,0 +1,13 @@
+#!/usr/bin/perl
+
+use EPrints;
+use Switch;
+
+my $repository = EPrints->new->current_repository;
+my $phraseid = $repository->param("phraseid");
+
+die("phraseid is malformed: $phraseid") unless($phraseid=~ /^[\w_\:\\]+$/);
+
+$repository->send_http_header( "content_type"=>"application/json" );
+print '{"'.$phraseid.'": "'.$repository->phrase($phraseid).'"}';
+
