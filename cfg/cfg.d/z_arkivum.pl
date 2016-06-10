@@ -78,13 +78,22 @@ $c->add_trigger( EP_TRIGGER_DYNAMIC_TEMPLATE, sub {
 
 	# dynamic CSS/JS settings
 	my $eprintid;
-	if(defined $repo->param("eprintid")){
-		$eprintid = $repo->param("eprintid");
-	}elsif($repo->current_url =~ /\/(\d+)$/){
-		$eprintid = $1;
-	}
+	my $username;
+	unless($repo->{offline}){
+		if(defined $repo->param("eprintid")){
+			$eprintid = $repo->param("eprintid");
+		}elsif($repo->current_url =~ /\/(\d+)$/){
+			$eprintid = $1;
+		}
+		$username = $repo->current_user->value("username");
 
-	if(defined $eprintid){	
+	}else{
+		#there must be a way to access eprintid when generating abstract here....
+		$eprintid = "undefined"; #for now we'll do this and get from url with js
+		$username = "undefined"; #for now we'll do this and get from url with js
+
+	}
+#	if(defined $eprintid){	
 		$head->appendChild( $repo->make_javascript(sprintf(<<'EOJ',
 var eprintid = %s;
 var repoid = %s;
@@ -98,9 +107,9 @@ EOJ
 			(map { EPrints::Utils::js_string( $_ ) }
 				 $repo->get_conf("arkivum","file_share_url") ),
 			(map { EPrints::Utils::js_string( $_ ) }
-				 $repo->current_user->value("username") ),
+				 $username ),
 		)) );
-	}
+#	}
 	my $libs = $arkivum->{libs}->{$arkivum->{lib_source}};
 	for my $lib(@{$libs}){
 		if($lib =~ /\.js$/){
@@ -123,6 +132,7 @@ EOJ
 
 	if( defined $pins->{'utf-8.head'} )
 	{
+		
 #		$pins->{'utf-8.head'} .= $xhtml->to_xhtml( $head );
 		$pins->{'utf-8.head'} =  $xhtml->to_xhtml( $head ).$pins->{'utf-8.head'};
 

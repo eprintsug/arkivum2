@@ -41,9 +41,12 @@ function Arkivum(config){
 	this.init = function(config){
 		self.set_options(config);
 		console.log("Arkivum initalised for eprint: ",self.eprintid);
+		
 		self.get_files_data();
-		self.get_shares();
-		self.get_user();
+		if(self.page_type == "dynamic"){
+			self.get_shares();
+			self.get_user();
+		}
 
 	};
 	this.set_options = function(config){
@@ -83,7 +86,7 @@ function Arkivum(config){
 			console.log("INIT FILE DATA",data);
 		 	self.render_file_tree();
 		    }
-		    setTimeout(self.get_files_data, 5000, true);
+		    setTimeout(self.get_files_data, 10000, true);
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
@@ -135,7 +138,15 @@ function Arkivum(config){
 	
 		var node = data.node,
 		tdList = j(node.tr).find(">td");
+		thList = j(node.tr).parents("table").find("th");
+
 		tdList.eq(0).text(node.getIndexHier());
+		//adjust the visibility of the folder columns here
+		if(node.isFolder() && self.page_type !== "dynamic"){
+			tdList.eq(10).hide();
+			tdList.eq(11).hide();
+		}
+
 		if(node.isFolder()) return true;
 
 		tdList.eq(3).html(self.render_size(node));
@@ -143,20 +154,27 @@ function Arkivum(config){
 		tdList.eq(4).html('<span class="glyphicon glyphicon-hdd '+node.data.astor_md.replicationState+'"></span>');
 		var accessed = node.data.astor_md.accessed.split(/T/);
 		tdList.eq(5).html('<span class="astor_accessed">'+accessed[0]+'</span>');
-		tdList.eq(6).html(' :: ');
+		tdList.eq(6).html('<span class="glyphicon glyphicon-option-vertical"></span>');
 
 		//EPrints doc md	
 		tdList.eq(7).html(self.render_link(node,"license",self.render_license(node)));
 		tdList.eq(8).html(self.render_link(node,"security",self.render_security(node)));
 		tdList.eq(9).html(self.render_link(node,"date_embargo",self.render_date_embargo(node)));
+		if(self.page_type == "dynamic"){
+			if(!self.ingested(node)){
+				tdList.eq(10).html(self.render_link(node,"ingest",self.render_ingest(node)));
+				tdList.eq(11).html(self.render_link(node,"delete",self.render_delete(node)));
 
-		if(!self.ingested(node)){
-			tdList.eq(10).html(self.render_link(node,"ingest",self.render_ingest(node)));
-			tdList.eq(11).html(self.render_link(node,"delete",self.render_delete(node)));
-
+			}else{
+				tdList.eq(10).html(self.render_ingest(node));
+				tdList.eq(11).html(self.render_delete(node));
+			}
 		}else{
-			tdList.eq(10).html(self.render_ingest(node));
-			tdList.eq(11).html(self.render_delete(node));
+			thList.eq(10).hide();
+			tdList.eq(10).hide();
+			thList.eq(11).hide();
+			tdList.eq(11).hide();
+
 		}
 	      };
 	//******************************
@@ -292,7 +310,7 @@ function Arkivum(config){
 		    PENDING, // file added to the pending archive package
 		    ARCHIVED   // file added to a closed archive package
 */
-
+	        if(node.isFolder()) return false;
 		if(j.inArray(node.data.astor_md.ingestState,["NOTINGESTED","SYNC","UNINIT","PRIMARY_IP","PRIMARY"])>=0)
 			return false;
 		return true;
@@ -447,7 +465,8 @@ function Arkivum(config){
 	// Render the metadata (icons)
 	//*****************************
 	this.render_size = function(node){
-		var size_span = j('<span>'+node.data.astor_md.size+'</span>');
+		size = node.data.astor_md.size.replace(/bytes/, 'B');
+		var size_span = j('<span>'+size+'</span>');
 		
 		return size_span;
 	};
@@ -482,6 +501,8 @@ function Arkivum(config){
 //			//phrase is available from doing the below... but too long in this context
 //			//self.set_phrase("licenses_typename_"+node.data.doc_md.license,license_span);
 		}
+		self.set_attr_phrase("licenses_typename_"+node.data.doc_md.license,license_span,"title");
+//		j(license_span).attr("title","expl here");
 		return license_span;
 	};
 
@@ -518,6 +539,9 @@ function Arkivum(config){
 	};
 
 	this.render_link = function(node, md, content){
+		if(self.page_type !== "dynamic"){
+			return content;
+		}
 		var link = j('<a href="#" class="update_'+md+'" data-key="'+node.key+'"></a>');
 		j(link).append(content);	
 		return link;
@@ -665,20 +689,61 @@ function Arkivum(config){
 		  });
 
 	};
+	this.set_attr_phrase = function(phraseid, selector, attr, context){
+		var url="/cgi/arkivum/get_phrase";
+		if(context == undefined) context = document;
+		j.ajax( url, {data : {phraseid: phraseid}, dataType: "json" } )
+		  .done(function(data) {
+			j(selector, context).attr(attr, data[phraseid]);
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "set_phrase complete" );
+		  });
+
+	};
+
 	//boot...
-	self.init();
+	self.init(config);
 }
 
 
 
 var j = jQuery;
 
+j.urlParam = function(name){
+	var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+	if(results === null) return 0;
+	return results[1] || 0;
+}
 j(document).ready(function(){
 
-	if(typeof eprintid === "undefined"){
+	//restrict (at the moment) to pages that can tell us an eprintid and are either the upload page or...
+	console.log("Stage: ",j.urlParam("stage"));
+	console.log("eprintid: ", eprintid);
+	var page_type = "dynamic";
+	var eprint_regex = /\/(\d+)(?:\/)$/;
+	if((typeof eprintid == undefined || eprintid == null) && document.location.pathname.match(eprint_regex)!=null){
+		//Looks like an abstract...
+		eprintid = document.location.pathname.match(eprint_regex)[1];
+		page_type = "static";
+	}
+	if(j.urlParam("stage") == 0 && page_type === "dynamic"){
+		//looks like a preview
+		page_type = "preview";
+	}
+	console.log("typeof eprintid: ", typeof eprintid);
+	console.log("eprintid: ", eprintid);
+
+
+	if((typeof eprintid === "undefined" || eprintid === null) && j.urlParam("stage") !== "files"){
+		console.log("NO");
 		return;
 	}
-	Arkivum({eprintid: eprintid});
+	console.log("PAGETYPE:",page_type);
+	Arkivum({eprintid: eprintid, page_type: page_type});
 //	console.log("hello eprint: ",eprintid);
 
 });
