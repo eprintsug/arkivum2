@@ -92,7 +92,8 @@ sub _arkivum_to_json
 			push @$ft_files, {title=>$f->{name}, key=>$f->{id}, folder=>"true", children=> [] };
 		}else{
 			my $file_key = Digest::MD5::md5_hex($f->{path}); #key is default path as id not always available
-			$file_key = $f->{id} if(defined $f->{id});
+			#Stick with above as key for now (TODO talk to Jeremy/Matthew about suitability of this approach)
+#			$file_key = $f->{id} if(defined $f->{id});
 			push @$ft_files, {title=>$f->{name}, key=>$file_key, astor_md => $f, doc_md => 0 };
 			#make file metadata from astor easily referencable by astorid
 		}
