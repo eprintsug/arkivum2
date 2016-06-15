@@ -9,10 +9,12 @@ my $action = $repository->param("action");
 my $password = $repository->param("password") || undef;
 my $username = $repository->param("username") || undef;
 my @astorids = $repository->param('astorids[]');      
+my $share_id = $repository->param("share_id") || undef;
 
 
-die("EPrintid is malformed: $eprintid") unless($eprintid=~ /^\d+$/);
-die("Action is not known: $action") unless(grep $_ eq $action, qw(get create, create_download));
+die("EPrintid is malformed: $eprintid") unless(!defined $eprintid || $eprintid=~ /^\d+$/);
+die("share_id is malformed: $share_id") unless(!defined $share_id || $share_id=~ /^\d+$/);
+die("Action is not known: $action") unless(grep $_ eq $action, qw(get create create_download));
 
 if($action eq "create"){
 
@@ -74,10 +76,11 @@ if($action eq "create_download"){
 	#A public link with a password, passwords may be mandatory depending on OC config
 #	$data->{password} = $password if(defined $password);
 	#A share with a specific user
-#	if(defined $username){
-#		$data->{shareWith} = $username;
-#		$data->{shareType} = 0;	
-#	}
+	print STDERR "USERNAME: ".$username."\n";
+	if(defined $username && $username ne "NO_USERNAME"){
+		$data->{shareWith} = $username;
+		$data->{shareType} = 0;	#usershare
+	}
 
       	my $url = $repository->get_conf("arkivum", "file_share_api")."/shares";
 
@@ -86,7 +89,12 @@ if($action eq "create_download"){
 }
 
 if($action eq "get"){
-	print _oc_getRequest("/shares?path=".$repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid);
+	if(defined $share_id){
+		print STDERR "HAVE SHAREID\n";
+		print _oc_getRequest("/shares/".$share_id);
+	}else{	
+		print _oc_getRequest("/shares?path=".$repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid);
+	}
 }
 
 sub _oc_getRequest
