@@ -276,12 +276,12 @@
 					<label>Password: </label> <input name="oc_pw" class="oc_pw" type="password"/>
 					<button class="ep_form_internal_button oc_create_user">Create user</button>
 				</div>
+			</div>
 				<h4>You can use a public (password protected) share link:</h4>
 					<p>Create a share link that will allow anyone with the password (entered below) to upload files to this item.</p>
 					<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>
 					<button class="ep_form_internal_button oc_create_share">Create share</button>
-			</div>
-			<h4>Currently available shares</h4>
+			<h3>Currently available shares</h3>
 			<ul class="shares_list"></ul>
 		</div>	
 
@@ -291,10 +291,9 @@
 			<h3>Download data via file share platform</h3>
 			<div class="have_oc_user">
 				<p>We have found an account on the file share platform with the same username as this account: <span class="ep_username"></span>. This means you can create a share and download files from <epc:phrase ref="archive_name"/> via the <a href="{$config{arkivum}{file_share_url}">file share website</a> or <a href="https://owncloud.org/sync-clients/">desktop client</a>, <a href="https://play.google.com/store/apps/details?id=com.owncloud.android">android</a> or <a href="https://itunes.apple.com/us/app/owncloud/id543672169?mt=8">iOS</a> app.</p>
-				<button class="ep_form_internal_button oc_create_user_share">Create share</button>
+				<button class="ep_form_internal_button oc_create_public_share">Create share</button>
 			</div>
 			<div class="have_not_oc_user">
-<!--
 				<p>We have not found an account on the file share platform that matches this account: <span class="ep_username"></span>.</p>
 				<div class="create_oc_user_div">
 				<h4>You can create a matching account: </h4>
@@ -303,7 +302,6 @@
 					<label>Password: </label> <input name="oc_pw" class="oc_pw" type="password"/>
 					<button class="ep_form_internal_button oc_create_user">Create user</button>
 				</div>
--->
 				<h4>You can use a public share link:</h4>
 					<p>Create a share link that will allow you to download.</p>
 				<!--	<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>-->
