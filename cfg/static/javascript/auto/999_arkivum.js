@@ -36,6 +36,7 @@ function Arkivum(config){
 
 	self = this;
 	//set default options here:
+	//TODO stop hard coding this ;p
         self.defaults = {user : {type: "validuser"}};
 
 	this.init = function(config){
@@ -198,6 +199,28 @@ function Arkivum(config){
 		    console.log( "get_shares complete" );
 		  });
 	};
+	this.get_share = function(share_id){
+		var url="/cgi/arkivum/shares";
+		var data = {share_id: share_id, action: 'get'};
+		console.log("url", url, data);
+
+		j.ajax( url, {data: data, dataType: "xml" } )
+		  .done(function(data) {
+			//TODO better share rendering with render_share
+	//	    self.shares = j("data > element", data);
+	//	    self.render_shares();
+		    console.log( "success", data );
+		    j("#public_share_link").html('Download data: <a href="'+file_share_url+'/apps/files/?dir='+j("data file_target",data).text()+'">'+j("data file_target",data).text()+'</a>');
+
+		  })
+		  .fail(function(jqXHR, textStatus) {
+		    console.log( "get_share error", textStatus );
+		  })
+		  .always(function() {
+		    console.log( "get_share complete" );
+		  });
+	};
+
 	this.render_shares = function(){
 		console.log(self.shares);
 		j("ul.shares_list").empty();
@@ -213,8 +236,9 @@ function Arkivum(config){
 	this.create_share = function(sw_username){
 		var data = {eprintid: eprintid, action: 'create'};
 		self._create_share(sw_username,data);		
+		return false;
 	};
-	this.create_public_share = function(e,sw_username){
+	this.create_public_share = function(e){
 		console.log("IN CREATE PUBLIC");
 		var url="/cgi/arkivum/shares";
 		var target = j(e.target); // Clicked button element (from the modal)
@@ -222,15 +246,22 @@ function Arkivum(config){
 
 		var data = {eprintid: eprintid, action: 'create_download'};
 		data.astorids = j(modal).data("astorids");
+		if(typeof username === "string")
+			data.username = username;
 
 		console.log("CALLING",url, data);
 		j.ajax( url, {data: data, dataType: "xml" } )
 		  .done(function(data) {
-			console.log(data);
 		    if(j("meta > statuscode", data).text() !== "100")
 			console.log("Could not create a share: "+j("meta > message", data).text());
-		    else
-			j("#public_share_link").html('<a href="'+j("data > url",data).text()+'">Public share link: '+j("data > token",data).text()+'</a>');
+		    else{
+			if(username != undefined){
+				console.log("THIS IS WHAT WE KNOW:",data);			
+				self.get_share(j("data > id", data).text());
+			}else{
+				j("#public_share_link").html('Download data: <a href="'+j("data > url",data).text()+'">'+j("data > token",data).text()+'</a>');
+			}
+		    }
 		  })
 		  .fail(function(jqXHR, textStatus) {
 		    console.log( "error", textStatus );
