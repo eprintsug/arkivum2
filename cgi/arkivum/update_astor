@@ -24,9 +24,10 @@ my $eprint = EPrints::DataObj::EPrint->new( $repository, $eprintid );
 #Lets modify the document md
 for my $doc($eprint->get_all_documents){
 	next if(!$doc->is_set("astorid")); #ignore local documents
-	print STDERR $doc->value("astorid")." ===> ".join(" - ", @astorids)."\n";
-
+#	print STDERR $doc->value("astorid")." ===> ".join(" - ", @astorids)."\n";
 	next if(!grep $_ eq $doc->value("astorid"), @astorids); #ignore unselected docs
+	#Not sure about this one as we want  astor to be the authority for this (no matter who is logged in)
+	#next if(!$doc->permit); #ignore any unpermitted docs that may have snuck through....
 	
 	_astor_delete($eprint->get_id."/".$doc->value("main")) if($action eq "delete");
 	if($action eq "ingest"){

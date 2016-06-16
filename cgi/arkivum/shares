@@ -58,8 +58,11 @@ if($action eq "create_download"){
 
 	for my $doc($eprint->get_all_documents){
 		next if(!$doc->is_set("astorid")); #ignore local documents
-		print STDERR $doc->value("astorid")." ===> ".join(" - ", @astorids)."\n";
 		next if(!grep $_ eq $doc->value("astorid"), @astorids); #ignore unselected docs
+		print STDERR $doc->value("astorid")." ".$doc->permit."\n";
+		next if(!$doc->permit("document/view", $doc)); #ignore any unpermitted docs that may have snuck through....
+
+		print STDERR "symlinking: ".$doc->value("astorid")."\n";
 
 		#TODO actually check security here too, don't trust the js input!!!
 		my $data = {source => "/".$repository->get_conf("arkivum", "ext_storage_name")."/".$eprintid."/".$doc->value("main"), link => $tmp_path."/".$doc->value("main")};
@@ -78,6 +81,7 @@ if($action eq "create_download"){
 	#A share with a specific user
 	print STDERR "USERNAME: ".$username."\n";
 	if(defined $username && $username ne "NO_USERNAME"){
+		print STDERR "Making a usershare...\n";
 		$data->{shareWith} = $username;
 		$data->{shareType} = 0;	#usershare
 	}
@@ -131,6 +135,7 @@ sub _oc_postRequest
 	#system($curl_cmd)==0 or return 0;
 	my $response = `$curl_cmd`;
 	my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	print STDERR $share_xml."\n";
 	return $share_xml;
      
 	#...need libwww6.0

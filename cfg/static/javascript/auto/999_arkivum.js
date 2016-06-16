@@ -246,6 +246,7 @@ function Arkivum(config){
 
 		var data = {eprintid: eprintid, action: 'create_download'};
 		data.astorids = j(modal).data("astorids");
+		//Need to assess  the whole  public/usershare piece properly		
 		if(typeof username === "string")
 			data.username = username;
 
@@ -255,7 +256,8 @@ function Arkivum(config){
 		    if(j("meta > statuscode", data).text() !== "100")
 			console.log("Could not create a share: "+j("meta > message", data).text());
 		    else{
-			if(username != undefined){
+			console.log("USERNAME: ",username);
+			if(username !== "NO_USERNAME"){
 				console.log("THIS IS WHAT WE KNOW:",data);			
 				self.get_share(j("data > id", data).text());
 			}else{
@@ -309,6 +311,11 @@ function Arkivum(config){
 	//Check for shares that already exist for this item
 	this.get_user = function(){
 		var url="/cgi/arkivum/users";
+		if(username === "NO_USERNAME"){
+			j(".have_oc_user").hide();		
+			j(".have_not_oc_user").hide();
+			 return false;
+		}
 		j.ajax( url, {data: {username: username, action: 'get'}, dataType: "xml" } )
 		  .done(function(data) {
 		    console.log( "success", data, username );
@@ -540,7 +547,7 @@ function Arkivum(config){
 		j('#'+md+'_modal').modal('show').data(data);
 		j('#'+md+'_modal').on('shown.bs.modal', function () {
 			j(".modal_filename").html(files_display);
-			console.log(files.length,files[0].data.doc_md[md])
+//			console.log(files.length,files[0].data.doc_md[md])
 			if(files.length == 1 && files[0].data.doc_md[md] != undefined){
 				j("option[value='"+files[0].data.doc_md[md]+"']",this).prop("selected",true);
 				j("input[value='"+security+"']",this).prop("checked",true);

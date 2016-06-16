@@ -23,11 +23,13 @@ die("License is malformed: $license") unless(!defined $license || $license ne ""
 die("Date embargo is malformed: $de") unless(!defined $de || $de ne "" || $de =~ qr/\d\d\d\d(?:-\d\d(?:-\d\d)?)?/);
 
 my $eprint = EPrints::DataObj::EPrint->new( $repository, $eprintid );
-
+my $user = $repository->current_user;
 #Lets modify the document md
 for my $doc($eprint->get_all_documents){
 	next if(!$doc->is_set("astorid")); #ignore local documents
 	next if(!grep $_ eq $doc->value("astorid"), @astorids); #ignore unselected docs
+	next if(!$doc->permit("document/view",$user)); #ignore any unpermitted docs that may have snuck through....
+
 	$doc->set_value("security",$security) if(defined $security);
 	$doc->set_value("license",$license) if(defined $license);
 	$doc->set_value("date_embargo",$de) if(defined $de || (!defined && $security eq "public"));

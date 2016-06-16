@@ -277,13 +277,14 @@
 					<button class="ep_form_internal_button oc_create_user">Create user</button>
 				</div>
 			</div>
-				<h4>You can use a public (password protected) share link:</h4>
-					<p>Create a share link that will allow anyone with the password (entered below) to upload files to this item.</p>
-					<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>
-					<button class="ep_form_internal_button oc_create_share">Create share</button>
-			<h3>Currently available shares</h3>
-			<ul class="shares_list"></ul>
+			<h4>You can use a public (password protected) share link:</h4>
+			<p>Create a share link that will allow anyone with the password (entered below) to upload files to this item.</p>
+			<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>
+			<button class="ep_form_internal_button oc_create_share">Create share</button>
+
 		</div>	
+		<h3>Currently available shares</h3>
+		<ul class="shares_list"></ul>
 
 	</epp:phrase>
     <epp:phrase id="down_share_panel">
@@ -302,11 +303,13 @@
 					<label>Password: </label> <input name="oc_pw" class="oc_pw" type="password"/>
 					<button class="ep_form_internal_button oc_create_user">Create user</button>
 				</div>
-				<h4>You can use a public share link:</h4>
-					<p>Create a share link that will allow you to download.</p>
-				<!--	<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>-->
-					<button class="ep_form_internal_button oc_create_public_share">Create share</button>
 			</div>
+			<!-- you can always create a public share -->
+			<h4>You can use a public share link:</h4>
+			<p>Create a share link that will allow you to download.</p>
+			<!--	<label>Password for share link: </label> <input name="share_pw" class="share_pw" type="password"/>-->
+			<button class="ep_form_internal_button oc_create_public_share">Create share</button>
+
 			<h4>Currently available shares</h4>
 			<p id="public_share_link"></p>
 		</div>	
