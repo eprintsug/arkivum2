@@ -1,3 +1,6 @@
+my $arkivum = $c->{arkivum};
+
+
 $arkivum->{file_share_api} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/ocs/v1.php/apps/files_sharing/api/v1";
 $arkivum->{file_share_url} = "https://".$arkivum->{file_share_host}."/index.php";
 $arkivum->{file_share_webdav} = "https://".$arkivum->{file_share_user}.":".$arkivum->{file_share_password}."\@".$arkivum->{file_share_host}."/remote.php/webdav";
