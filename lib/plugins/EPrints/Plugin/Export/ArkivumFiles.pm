@@ -313,8 +313,7 @@ sub _astor_postRequest
       $ua->default_header( "Content-Type" =>  "application/x-www-form-urlencoded");
 	#to do this...?
      # $ua->ssl_opts( verify_hostname => 0 ,SSL_verify_mode => 0x00);
-      my $req = HTTP::Request::Common::POST $server_url,
-                $data;
+      my $req = HTTP::Request::Common::POST($server_url,$data);
 
       my $response = $ua->request($req);
 	print STDERR $response->status_line."**\n";
