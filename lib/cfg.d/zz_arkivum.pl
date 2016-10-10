@@ -17,7 +17,7 @@ $arkivum->{libs} = {
 		    cdn => [
 			"https://code.jquery.com/jquery-2.2.3.min.js",
 			"https://cdnjs.cloudflare.com/ajax/libs/js-cookie/2.0.1/js.cookie.min.js",
-			"https://code.jquery.com/ui/1.10.4/jquery-ui.min.js",
+			"https://code.jquery.com/ui/1.12.1/jquery-ui.min.js",
 			"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js",
 			"https://cdnjs.cloudflare.com/ajax/libs/jquery.fancytree/2.17.0/jquery.fancytree-all.min.js",
 			"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
