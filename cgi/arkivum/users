@@ -2,9 +2,13 @@
 
 use EPrints;
 use Switch;
+use strict;
 
 my $repository = EPrints->new->current_repository;
-my $username = $repository->param("username");
+
+#my $username = $repository->param("username");
+my $user = $repository->current_user;
+my $username = $user->value("username");
 my $action = $repository->param("action");
 my $password = $repository->param("password") || undef;
 
@@ -16,10 +20,26 @@ if($action eq "create"){
 
 	die("Scared of characters in password: $password") unless(defined $password && $password=~ /^[A-Za-z0-9\.\-]+$/);
 
+
 	my $data = {userid => $username,
-		    password => $password};
+		    password => $password,
+            	    };
 
 	my $users_xml = _oc_postRequest("/users", $data);
+
+	my $status_code = $users_xml->findvalue('//statuscode');
+	if($status_code == 100){ #success
+		#Add email
+		if( $user->is_set("email")){ 
+			my $set_email_xml = _oc_putRequest("/users/$username", {key => "email", value=> $user->value("email")} );
+		}
+		#Add to group
+		if(defined $repository->get_conf("arkivum", "file_share_group")){
+			my $groupid = $repository->get_conf("arkivum", "file_share_group");
+			my $set_group_xml = _oc_postRequest("/users/$username/groups", {groupid => $groupid} );
+		}
+	}
+
 	print $repository->xml->to_string($users_xml);
 }
 
@@ -73,5 +93,26 @@ sub _oc_postRequest
       my $response = $ua->request($req);
 	print STDERR $response->status_line."**\n";
       return $response;
+}
+
+sub _oc_putRequest
+{
+      my( $url, $data ) = @_;
+
+      my $ark_server = $repository->get_conf("arkivum", "oc_users_api");
+
+      my $server_url = $ark_server . $url;
+      print STDERR "PUT: ".$server_url."\n";
+	#not ideal but...
+	my $curl_cmd = "curl -k -X PUT $server_url ";
+	while(my($k,$v) = each %{$data}){
+		$curl_cmd .=" -d ".$k."=".$v;
+	}
+	print STDERR $curl_cmd."\n";
+	#system($curl_cmd)==0 or return 0;
+	my $response = `$curl_cmd`;
+	my $share_xml = $repository->xml->parse_string($response) || print STDERR "Could not parse response: $response\n";
+	return $share_xml;
+     
 }
 
