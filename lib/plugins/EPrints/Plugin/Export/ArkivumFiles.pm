@@ -9,9 +9,16 @@ package EPrints::Plugin::Export::ArkivumFiles;
 use EPrints::Plugin::Export::TextFile;
 use JSON;
 
+use Data::Find qw( diter );
+#this module makes spurious warnings 9comment this out if it starts to go screwy and you need to know why
+$SIG{'__WARN__'} = sub { warn $_[0] unless (caller eq "Data::Find"); }; 
+		
 @ISA = ( "EPrints::Plugin::Export::TextFile" );
 
 use strict;
+
+#a string to use as a value for null doc_md (we can search for this string with Data::Find)
+use constant NO_MD => "9rv1X5U96nCOUresFeDPJHH9rUs5Sk9A";
 
 sub new
 {
@@ -76,42 +83,27 @@ sub _arkivum_to_json
 	#This will come from arkivum api...
 #	my $file_info = $self->_astor_getFileInfo();
 	my $json = $self->_astor_getFolder($eprint->get_id);
-#	print STDERR $json."\n";
+	
 	if($json =~ /^404/){
 		$self->_log("Could not create folder") unless $self->_astor_createFolder($eprint->get_id);
 		$json = $self->_astor_getFolder($eprint->get_id);
 	}
+	
+	my $ft_files = $self->make_ft_files([], $json->{files}, $eprint->get_id, "");
 
-	#merge/sync astor and eprints file metadata... possibly we will do this elsewhere so it is no attempted at every export...  
-	#but maybe doing it here is the best way to ensure a reliable picture
-	my $ft_files = [];
-	for my $f (@{$json->{files}}){
-	#	print STDERR $f->{type}." **\n";
-
-		if($f->{type} =~ /^Folder$/){
-			push @$ft_files, {title=>$f->{name}, key=>$f->{id}, folder=>"true", children=> [] };
-		}else{
-			my $file_key = Digest::MD5::md5_hex($f->{path}); #key is default path as id not always available
-			#Stick with above as key for now (TODO talk to Jeremy/Matthew about suitability of this approach)
-#			$file_key = $f->{id} if(defined $f->{id});
-			push @$ft_files, {title=>$f->{name}, key=>$file_key, astor_md => $f, doc_md => 0 };
-			#make file metadata from astor easily referencable by astorid
-		}
-	}
 	#loop through existing documents and merge metadata from the astor and eprints
 	for my $doc($eprint->get_all_documents){
-		#NEED AN ALTERNATIVE KEY FOR WHEN THERE IS NO ASTORID (PROBABLY PATH IS BEST WE'VE GOT)
+		
 		if($doc->is_set("astorid")){
 			#We have a file we need to merge with arkivum data
 			#encode as json and
-#			print STDERR "ASTORID: ".$doc->value("astorid")."\n";
-			my ($ft_file) = grep { $_->{key} eq $doc->value("astorid") } @$ft_files;
+			my $ft_file = $self->_find_file_by_astorid($ft_files, $doc->value("astorid"));
+
 #			print STDERR "FT_FILE - name : ".$ft_file->{title}."\n";
 #			print STDERR "FT_FILE - doc_md : ".$ft_file->{doc_md}."\n";
 			if(defined $ft_file){
 				#merge existing sets of metadata 
-				# (may need to process a subset of doc_md rather than shoce in the lot as below)
-#				print STDERR "Merging $ft_file and ".$doc->{data}."\n";
+				# (may need to process a subset of doc_md rather than shove in the lot as below)
 				$ft_file->{doc_md} = $doc->{data};
 			}else{
 				#remove the eprints doc metadata as file no longer on astor...
@@ -120,11 +112,14 @@ sub _arkivum_to_json
 		}
 	}
 	my $ds = $self->{repository}->get_dataset( "document" );
+	
 	#get all ft_files that have no doc_md defined (ie no eprint docuemnt object exists yet)
-	my @files_with_no_md = grep { $_->{folder} ne "true" && $_->{doc_md} == 0 } @$ft_files;
-	for my $ft_file (@files_with_no_md){
-		print STDERR "FILENAME: ".$ft_file->{title}."\n";
-#		print STDERR "MD5: ".$ft_file->{astor_md}->{MD5checksum}."\n"; #almost certain not to have this at this stage
+	my $files_with_no_md = $self->_filter_files_by_md($ft_files);
+
+	for my $ft_file (@$files_with_no_md){
+
+		#print STDERR "##### FILENAME: ".$ft_file->{title}." #######\n";
+		#print STDERR "MD5: ".$ft_file->{astor_md}->{MD5checksum}."\n"; #almost certain not to have this at this stage
 
 		my $epdata = {eprintid => $eprint->get_id, 
 				astorid=> $ft_file->{key}, 
@@ -138,9 +133,78 @@ sub _arkivum_to_json
 		my $doc = EPrints::DataObj::Document->create_from_data( $self->{session}, $epdata, $ds );
 		$ft_file->{doc_md} = $doc->{data};
 	}
-
+	
 	$files->{children} = $ft_files;
 	return encode_json $files;
+}
+
+## Construct an abitrary depth structure that is compatible with the jquer filetree plugin
+# files_arr - the files part of the arkivum api call
+# parent - the parent directory
+# path - the current path (as a string) to this point of the structure
+#
+
+sub make_ft_files {
+	
+	my ($self, $ft_files, $files_arr, $parent, $path) = @_;
+	
+	for my $f (@{$files_arr}){
+		
+		if($f->{type} =~ /^Folder$/){
+			#we have a folder, so we re-request the contents from arkivum api
+			my $sub_json = $self->_astor_getFolder($parent."/".$f->{name});
+			#get the next index
+			my $i = scalar @{eval "\$ft_files$path"};
+			#push on the folder (using the $path string to put it in the correct level of the structure)
+			push @{eval "\$ft_files$path"}, {title=>$f->{name}, key=>$f->{id}, folder=>"true", children=> [] };
+			#re-call this sub with the next level of files
+			$self->make_ft_files($ft_files, $sub_json->{files}, $parent."/".$f->{name},$path."->[$i]->{children}");
+		}else{
+			#make an id from path and name
+			my $file_key = Digest::MD5::md5_hex($f->{path}."/".$f->{name});
+			#we have a file, lets add it (using the $path string to put it in the correct level)
+			push @{eval "\$ft_files$path"}, {title=>$f->{name}, key=>$file_key, astor_md => $f, doc_md => NO_MD };
+		}
+	}
+	return $ft_files;
+}
+
+#This will return the ft_file from the abitraily deep ft_files object
+sub _find_file_by_astorid {
+	my ($self, $ft_files, $astorid) = @_;
+	
+	my $iter = diter $ft_files, $astorid; 
+  	#we only xpect one... retun on first match
+	while ( my ( $path, $obj ) = $iter->() ) {
+		#make path work on refs	
+		$path =~ s/\[/->[/g;
+		$path =~ s/\{/->{/g;
+		#and knock the last bit off to get...
+		$path =~ s/->\{key\}$//;
+		#the ft_file
+		return eval "\$ft_files$path";
+	}
+}
+
+#This will return the ft_files that have no md set... from the abitraily deep ft_files object
+sub _filter_files_by_md {
+	my ($self,  $ft_files) = @_;
+
+	my $filtered = [];	
+	my $iter = diter $ft_files, NO_MD; 
+	while ( my ( $path, $obj ) = $iter->() ) {
+
+		#make path work on refs	
+		$path =~ s/\[/->[/g;
+		$path =~ s/\{/->{/g;
+		#and knock the last bit off to get...
+		$path =~ s/->\{doc_md\}$//;
+
+		#the ft_file
+		push @$filtered, eval "\$ft_files$path";
+  	}
+
+	return $filtered;
 }
 
 sub _astor_getFileInfo
@@ -152,6 +216,7 @@ sub _astor_getFileInfo
       my $file_share_folder = $repo->get_conf("arkivum", "file_share_folder");
 
       my $api_url = "/api/2/files/fileInfo/" . $file_share_folder . $filename;
+      print STDERR "API_URL: $api_url\n";
       my $response = $self->_astor_getRequest($api_url);
 
       if ( not defined $response )
