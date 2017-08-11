@@ -101,7 +101,7 @@ sub _arkivum_to_json
 
 #			print STDERR "FT_FILE - name : ".$ft_file->{title}."\n";
 #			print STDERR "FT_FILE - doc_md : ".$ft_file->{doc_md}."\n";
-			if(defined $ft_file){
+			if(defined $ft_file && $ft_file){
 				#merge existing sets of metadata 
 				# (may need to process a subset of doc_md rather than shove in the lot as below)
 				$ft_file->{doc_md} = $doc->{data};
@@ -147,8 +147,9 @@ sub _arkivum_to_json
 sub make_ft_files {
 	
 	my ($self, $ft_files, $files_arr, $parent, $path) = @_;
-	
-	for my $f (@{$files_arr}){
+	my @files_sorted = sort {lc($a->{name}) cmp lc($b->{name})}  @$files_arr;	
+	for my $f (@files_sorted){
+
 		
 		if($f->{type} =~ /^Folder$/){
 			#we have a folder, so we re-request the contents from arkivum api
@@ -160,8 +161,9 @@ sub make_ft_files {
 			#re-call this sub with the next level of files
 			$self->make_ft_files($ft_files, $sub_json->{files}, $parent."/".$f->{name},$path."->[$i]->{children}");
 		}else{
-			#make an id from path and name
-			my $file_key = Digest::MD5::md5_hex($f->{path}."/".$f->{name});
+			#make an id from path
+			my $file_key = Digest::MD5::md5_hex($f->{path});
+
 			#we have a file, lets add it (using the $path string to put it in the correct level)
 			push @{eval "\$ft_files$path"}, {title=>$f->{name}, key=>$file_key, astor_md => $f, doc_md => NO_MD };
 		}
@@ -174,6 +176,7 @@ sub _find_file_by_astorid {
 	my ($self, $ft_files, $astorid) = @_;
 	
 	my $iter = diter $ft_files, $astorid; 
+
   	#we only xpect one... retun on first match
 	while ( my ( $path, $obj ) = $iter->() ) {
 		#make path work on refs	
